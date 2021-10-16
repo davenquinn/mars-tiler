@@ -1,0 +1,17 @@
+[tool.poetry]
+authors = ["Daven Quinn <dev@davenquinn.com>"]
+description = ""
+name = "mars-tile-server"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+titiler = "^0.3.11"
+uvicorn = "^0.15.0"
+cogeo-mosaic = "^3.0.2"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0"]
