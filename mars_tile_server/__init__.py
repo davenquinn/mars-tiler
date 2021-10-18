@@ -13,6 +13,7 @@ import click
 # from cogeo_mosaic.backends import MosaicBackend
 # from cogeo_mosaic.mosaic import MosaicJSON
 from cogeo_mosaic.utils import _filter_futures
+from cogeo_mosaic.mosaic import MosaicJSON
 from rio_tiler.io import COGReader
 from rasterio.vrt import WarpedVRT
 from rasterio.crs import CRS
@@ -22,6 +23,7 @@ from typing import Sequence, Dict, List
 from pathlib import Path
 from rich import print
 from concurrent import futures
+import warnings
 
 cli = typer.Typer()
 
@@ -113,9 +115,40 @@ def get_footprints(
 
 
 @cli.command()
-def create_mosaic(files: List[Path]):
-    footprints = get_footprints(files, quiet=False)
-    print(footprints)
+def create_mosaic(files: List[Path], quiet: bool = False):
+    features = get_footprints(files, quiet=quiet)
+
+    minzoom = None
+    maxzoom = None
+
+    if minzoom is None:
+        data_minzoom = {feat["properties"]["minzoom"] for feat in features}
+        if len(data_minzoom) > 1:
+            warnings.warn(
+                "Multiple MinZoom, Assets different minzoom values", UserWarning
+            )
+
+        minzoom = max(data_minzoom)
+
+    if maxzoom is None:
+        data_maxzoom = {feat["properties"]["maxzoom"] for feat in features}
+        if len(data_maxzoom) > 1:
+            warnings.warn(
+                "Multiple MaxZoom, Assets have multiple resolution values",
+                UserWarning,
+            )
+
+        maxzoom = max(data_maxzoom)
+
+    datatype = {feat["properties"]["datatype"] for feat in features}
+    if len(datatype) > 1:
+        raise Exception("Dataset should have the same data type")
+
+    mosaic = MosaicJSON._create_mosaic(
+        features, minzoom=minzoom, maxzoom=maxzoom, quiet=quiet
+    )
+    with output.open("w") as f:
+        f.write(mosaic.json(exclude_none=True))
 
 
 # def create_mosaic(input_files):
