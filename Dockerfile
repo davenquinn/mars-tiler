@@ -14,7 +14,8 @@ RUN apt-get update && \
 COPY poetry.lock pyproject.toml /code/
 
 # Project initialization:
-RUN poetry config virtualenvs.create false \
+RUN --mount=type=cache,target=/root/.cache \
+  poetry config virtualenvs.create false \
   && poetry install --no-dev --no-interaction --no-ansi --no-root
 
 # Creating folders, and files for a project:
