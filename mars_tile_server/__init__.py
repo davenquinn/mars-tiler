@@ -14,6 +14,7 @@ import click
 # from cogeo_mosaic.mosaic import MosaicJSON
 from cogeo_mosaic.utils import _filter_futures
 from cogeo_mosaic.mosaic import MosaicJSON
+from cogeo_mosaic.backends import MosaicBackend
 from rio_tiler.io import COGReader
 from rasterio.vrt import WarpedVRT
 from rasterio.crs import CRS
@@ -24,6 +25,11 @@ from pathlib import Path
 from rich import print
 from concurrent import futures
 import warnings
+from titiler.core.factory import TilerFactory
+from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
+
+from fastapi import FastAPI
+
 
 cli = typer.Typer()
 
@@ -115,7 +121,7 @@ def get_footprints(
 
 
 @cli.command()
-def create_mosaic(files: List[Path], quiet: bool = False):
+def create_mosaic(files: List[Path], output: Path, quiet: bool = False):
     features = get_footprints(files, quiet=quiet)
 
     minzoom = None
@@ -147,8 +153,18 @@ def create_mosaic(files: List[Path], quiet: bool = False):
     mosaic = MosaicJSON._create_mosaic(
         features, minzoom=minzoom, maxzoom=maxzoom, quiet=quiet
     )
-    with output.open("w") as f:
-        f.write(mosaic.json(exclude_none=True))
+
+    with MosaicBackend(str(output), mosaic_def=mosaic) as mosaic:
+        mosaic.write(overwrite=True)
+
+
+app = FastAPI(title="My simple app")
+
+backend = MosaicBackend("/mars-data/hirise-images/hirise-red.mosaic.json")
+cog = TilerFactory()
+app.include_router(cog.router, tags=["HiRISE RED"])
+
+add_exception_handlers(app, DEFAULT_STATUS_CODES)
 
 
 # def create_mosaic(input_files):
