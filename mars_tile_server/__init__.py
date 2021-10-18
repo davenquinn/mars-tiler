@@ -1,5 +1,7 @@
 import json
 import os
+import sys
+import click
 
 # import click
 # import cligj
@@ -10,14 +12,16 @@ import os
 # from cogeo_mosaic import __version__ as cogeo_mosaic_version
 # from cogeo_mosaic.backends import MosaicBackend
 # from cogeo_mosaic.mosaic import MosaicJSON
+from cogeo_mosaic.utils import _filter_futures
 from rio_tiler.io import COGReader
 from rasterio.vrt import WarpedVRT
 from rasterio.crs import CRS
 import rasterio
 import typer
-from typing import List, Dict
+from typing import Sequence, Dict, List
 from pathlib import Path
 from rich import print
+from concurrent import futures
 
 cli = typer.Typer()
 
@@ -55,7 +59,9 @@ def fake_earth_crs(crs: CRS) -> CRS:
     data = crs.to_dict()
     radius = data.get("R", None)
     if radius is None:
-        raise AttributeError("CRS does not have 'R' parameter...")
+        raise AttributeError(
+            "Error faking Earth CRS: Input does not have 'R' parameter..."
+        )
     if radius == EARTH_RADIUS:
         return crs
     data["R"] = EARTH_RADIUS
@@ -63,7 +69,7 @@ def fake_earth_crs(crs: CRS) -> CRS:
 
 
 def get_dataset_info(src_path: str) -> Dict:
-    """Get rasterio dataset meta."""
+    """Get rasterio dataset meta, faking an Earth CRS internally as needed."""
     with rasterio.open(src_path) as src_dst:
         with WarpedVRT(
             src_dst,
@@ -74,12 +80,42 @@ def get_dataset_info(src_path: str) -> Dict:
                 return get_cog_info(str(src_path), cog)
 
 
+def get_footprints(
+    dataset_list: Sequence[Path], max_threads: int = 20, quiet: bool = True
+) -> List:
+    """
+    Create footprint GeoJSON.
+    Attributes
+    ----------
+    dataset_listurl : tuple or list, required
+        Dataset urls.
+    max_threads : int
+        Max threads to use (default: 20).
+    Returns
+    -------
+    out : tuple
+        tuple of footprint feature.
+    """
+    fout = os.devnull if quiet else sys.stderr
+    with futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
+        future_work = [executor.submit(get_dataset_info, item) for item in dataset_list]
+        with click.progressbar(  # type: ignore
+            futures.as_completed(future_work),
+            file=fout,
+            length=len(future_work),
+            label="Get footprints",
+            show_percent=True,
+        ) as future:
+            for _ in future:
+                pass
+
+    return list(_filter_futures(future_work))
+
+
 @cli.command()
 def create_mosaic(files: List[Path]):
-    for file in files:
-        print(file)
-        info = get_dataset_info(file)
-        print(info)
+    footprints = get_footprints(files, quiet=False)
+    print(footprints)
 
 
 # def create_mosaic(input_files):
