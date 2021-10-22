@@ -28,6 +28,7 @@ from concurrent import futures
 import warnings
 import attr
 from titiler.mosaic.factory import MosaicTilerFactory
+from titiler.mosaic.errors import MOSAIC_STATUS_CODES
 from titiler.core.factory import TilerFactory
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 
@@ -175,6 +176,7 @@ mosaic = MosaicTilerFactory(reader=MosaicBackend, path_dependency=build_path)
 app = FastAPI(title="Mars tile server")
 app.include_router(mosaic.router, tags=["HiRISE RED"], prefix="/hirise")
 add_exception_handlers(app, DEFAULT_STATUS_CODES)
+add_exception_handlers(app, MOSAIC_STATUS_CODES)
 
 
 # def create_mosaic(input_files):
