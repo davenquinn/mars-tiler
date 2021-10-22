@@ -18,6 +18,8 @@ RUN --mount=type=cache,target=/root/.cache \
   poetry config virtualenvs.create false \
   && poetry install --no-dev --no-interaction --no-ansi --no-root
 
+EXPOSE 8000
+
 # Creating folders, and files for a project:
 COPY . /code
 

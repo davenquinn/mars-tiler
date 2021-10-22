@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import click
+from dataclasses import dataclass
 
 # import click
 # import cligj
@@ -25,6 +26,7 @@ from pathlib import Path
 from rich import print
 from concurrent import futures
 import warnings
+from titiler.mosaic.factory import MosaicTilerFactory
 from titiler.core.factory import TilerFactory
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 
@@ -158,12 +160,20 @@ def create_mosaic(files: List[Path], output: Path, quiet: bool = False):
         mosaic.write(overwrite=True)
 
 
-app = FastAPI(title="My simple app")
-
 backend = MosaicBackend("/mars-data/hirise-images/hirise-red.mosaic.json")
-cog = TilerFactory()
-app.include_router(cog.router, tags=["HiRISE RED"])
 
+
+@dataclass
+class MosaicTiler(MosaicTilerFactory):
+    """IDK why I need to subclass the factory"""
+
+    ...
+
+
+mosaic = MosaicTiler(reader=backend)
+
+app = FastAPI(title="My simple app")
+app.include_router(mosaic.router, tags=["HiRISE RED"], prefix="/hirise")
 add_exception_handlers(app, DEFAULT_STATUS_CODES)
 
 
