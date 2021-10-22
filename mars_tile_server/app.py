@@ -8,7 +8,7 @@ from titiler.mosaic.errors import MOSAIC_STATUS_CODES
 from titiler.core.factory import TilerFactory
 from titiler.core.dependencies import DatasetParams, RenderParams
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
-from .util import FakeEarthCOGReader
+from .util import ElevationReader, FakeEarthCOGReader
 
 
 def build_path():
@@ -25,10 +25,14 @@ def elevation_path():
 
 
 cog = TilerFactory(path_dependency=elevation_path, reader=FakeEarthCOGReader)
+cog_elevation = TilerFactory(path_dependency=elevation_path, reader=ElevationReader)
 
 
 app.include_router(mosaic.router, tags=["HiRISE Mosaic"], prefix="/hirise-mosaic")
 app.include_router(cog.router, tags=["Global DEM"], prefix="/global-dem")
+app.include_router(
+    cog_elevation.router, tags=["Global RGB DEM"], prefix="/global-dem-rgb"
+)
 
 
 def HiRISEParams(

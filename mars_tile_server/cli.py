@@ -6,7 +6,7 @@ from cogeo_mosaic.utils import _filter_futures
 from cogeo_mosaic.mosaic import MosaicJSON
 from cogeo_mosaic.backends import MosaicBackend
 import typer
-from typing import Sequence, List, Dict
+from typing import Sequence, List
 from pathlib import Path
 from concurrent import futures
 import warnings
