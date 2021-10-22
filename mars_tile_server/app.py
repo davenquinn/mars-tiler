@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional, Union, List
+import logging
 
 from fastapi import FastAPI, Query
 from cogeo_mosaic.backends import MosaicBackend
@@ -70,3 +71,11 @@ app.include_router(hirise_cog.router, tags=["HiRISE images"], prefix="/hirise")
 
 add_exception_handlers(app, DEFAULT_STATUS_CODES)
 add_exception_handlers(app, MOSAIC_STATUS_CODES)
+
+
+@app.on_event("startup")
+async def startup_event():
+    logger = logging.getLogger("mars_tile_server")
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+    logger.addHandler(handler)

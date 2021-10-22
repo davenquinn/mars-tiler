@@ -8,6 +8,9 @@ from rio_tiler.reader import part
 from rasterio.crs import CRS
 from rio_rgbify.encoders import data_to_rgb
 import rasterio
+import logging
+
+log = logging.getLogger(__name__)
 
 
 EARTH_RADIUS = 6378137
@@ -92,10 +95,12 @@ class ElevationReader(FakeEarthCOGReader):
         if bounds_crs and bounds_crs != dst_crs:
             bbox = transform_bounds(bounds_crs, dst_crs, *bbox, densify_pts=21)
 
-        print(data)
+        res = data_to_rgb(data, -10000, 0.1)
+        log.info(data)
+        log.info(res)
 
         return ImageData(
-            data_to_rgb(data, -10000, 0.1),
+            res,
             mask,
             bounds=bbox,
             crs=dst_crs,
