@@ -26,6 +26,7 @@ from pathlib import Path
 from rich import print
 from concurrent import futures
 import warnings
+import attr
 from titiler.mosaic.factory import MosaicTilerFactory
 from titiler.core.factory import TilerFactory
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
@@ -127,7 +128,7 @@ def create_mosaic(files: List[Path], output: Path, quiet: bool = False):
     features = get_footprints(files, quiet=quiet)
 
     minzoom = None
-    maxzoom = None
+    maxzoom = 8
 
     if minzoom is None:
         data_minzoom = {feat["properties"]["minzoom"] for feat in features}
@@ -160,19 +161,18 @@ def create_mosaic(files: List[Path], output: Path, quiet: bool = False):
         mosaic.write(overwrite=True)
 
 
-backend = MosaicBackend("/mars-data/hirise-images/hirise-red.mosaic.json")
-
-
 @dataclass
 class MosaicTiler(MosaicTilerFactory):
     """IDK why I need to subclass the factory"""
 
-    ...
+
+def build_path():
+    return "/mars-data/hirise-images/hirise-red.mosaic.json"
 
 
-mosaic = MosaicTiler(reader=backend)
+mosaic = MosaicTilerFactory(reader=MosaicBackend, path_dependency=build_path)
 
-app = FastAPI(title="My simple app")
+app = FastAPI(title="Mars tile server")
 app.include_router(mosaic.router, tags=["HiRISE RED"], prefix="/hirise")
 add_exception_handlers(app, DEFAULT_STATUS_CODES)
 
