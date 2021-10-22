@@ -80,16 +80,23 @@ def fake_earth_crs(crs: CRS) -> CRS:
     return CRS.from_dict(data)
 
 
+class FakeEarthCOGReader(COGReader):
+    def __init__(self, src_path, dataset=None, *args, **kwargs):
+        self.src_dst = dataset
+        if self.src_dst is None:
+            self.src_dst = rasterio.open(src_path)
+        dataset = WarpedVRT(self.src_dst, src_crs=fake_earth_crs(self.src_dst.crs))
+        super().__init__(None, dataset, *args, **kwargs)
+
+    def close(self):
+        self.src_dst.close()
+        super().close()
+
+
 def get_dataset_info(src_path: str) -> Dict:
     """Get rasterio dataset meta, faking an Earth CRS internally as needed."""
-    with rasterio.open(src_path) as src_dst:
-        with WarpedVRT(
-            src_dst,
-            # Fake an Earth radius.
-            src_crs=fake_earth_crs(src_dst.crs),
-        ) as vrt_dst:
-            with COGReader(None, dataset=vrt_dst) as cog:
-                return get_cog_info(str(src_path), cog)
+    with FakeEarthCOGReader(src_path, dataset=src_path) as cog:
+        return get_cog_info(str(src_path), cog)
 
 
 def get_footprints(
@@ -162,11 +169,6 @@ def create_mosaic(files: List[Path], output: Path, quiet: bool = False):
         mosaic.write(overwrite=True)
 
 
-@dataclass
-class MosaicTiler(MosaicTilerFactory):
-    """IDK why I need to subclass the factory"""
-
-
 def build_path():
     return "/mars-data/hirise-images/hirise-red.mosaic.json"
 
@@ -174,7 +176,16 @@ def build_path():
 mosaic = MosaicTilerFactory(reader=MosaicBackend, path_dependency=build_path)
 
 app = FastAPI(title="Mars tile server")
-app.include_router(mosaic.router, tags=["HiRISE RED"], prefix="/hirise")
+
+
+def elevation_path():
+    return "/mars-data/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif"
+
+
+cog = TilerFactory(path_dependency=elevation_path, reader=FakeEarthCOGReader)
+
+app.include_router(mosaic.router, tags=["HiRISE"], prefix="/hirise")
+app.include_router(cog.router, tags=["Global DEM"], prefix="/global-dem")
 add_exception_handlers(app, DEFAULT_STATUS_CODES)
 add_exception_handlers(app, MOSAIC_STATUS_CODES)
 
