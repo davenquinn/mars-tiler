@@ -1,8 +1,12 @@
+from dataclasses import dataclass
+from typing import Optional, Union, List
+
 from fastapi import FastAPI, Query
 from cogeo_mosaic.backends import MosaicBackend
 from titiler.mosaic.factory import MosaicTilerFactory
 from titiler.mosaic.errors import MOSAIC_STATUS_CODES
 from titiler.core.factory import TilerFactory
+from titiler.core.dependencies import DatasetParams, RenderParams
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 from .util import FakeEarthCOGReader
 
@@ -34,7 +38,30 @@ def HiRISEParams(
     return f"/mars-data/hirise-images/{image_id}_{image_type}.tif"
 
 
-hirise_cog = TilerFactory(path_dependency=HiRISEParams, reader=FakeEarthCOGReader)
+@dataclass
+class HiRISEImageParams(DatasetParams):
+    """Low level WarpedVRT Optional parameters."""
+
+    nodata: Optional[Union[str, int, float]] = Query(
+        0, title="Nodata value", description="Overwrite internal Nodata value"
+    )
+
+
+@dataclass
+class HiRISERenderParams(RenderParams):
+    rescale: Optional[List[str]] = Query(
+        ["100,1200"],
+        title="Min/Max data Rescaling",
+        description="comma (',') delimited Min,Max bounds. Can set multiple time for multiple bands.",
+    )
+
+
+hirise_cog = TilerFactory(
+    reader=FakeEarthCOGReader,
+    path_dependency=HiRISEParams,
+    dataset_dependency=HiRISEImageParams,
+    render_dependency=HiRISERenderParams,
+)
 app.include_router(hirise_cog.router, tags=["HiRISE images"], prefix="/hirise")
 
 add_exception_handlers(app, DEFAULT_STATUS_CODES)
