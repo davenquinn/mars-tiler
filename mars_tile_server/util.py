@@ -1,15 +1,10 @@
-from typing import Any, Dict, Optional, Sequence, Union
+from typing import Dict
 from rio_tiler.io import COGReader
-from rio_tiler.models import ImageData
-from rio_tiler.constants import WGS84_CRS, BBox
 from rasterio.vrt import WarpedVRT
-from rasterio.warp import transform_bounds
-from rio_tiler.reader import part
 from rasterio.crs import CRS
 from rio_rgbify.encoders import data_to_rgb
 import rasterio
 import logging
-import attr
 
 log = logging.getLogger(__name__)
 
