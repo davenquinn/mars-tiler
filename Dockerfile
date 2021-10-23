@@ -16,7 +16,7 @@ COPY poetry.lock pyproject.toml /code/
 # Project initialization:
 RUN --mount=type=cache,target=/root/.cache \
   poetry config virtualenvs.create false \
-  && poetry install --no-dev --no-interaction --no-ansi --no-root
+  && poetry install --no-interaction --no-ansi --no-root
 
 EXPOSE 8000
 
@@ -24,4 +24,4 @@ EXPOSE 8000
 COPY . /code
 
 # Install the root package
-RUN poetry install --no-dev --no-interaction --no-ansi 
+RUN poetry install --no-interaction --no-ansi 

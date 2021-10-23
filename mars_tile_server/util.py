@@ -9,6 +9,7 @@ from rasterio.crs import CRS
 from rio_rgbify.encoders import data_to_rgb
 import rasterio
 import logging
+import attr
 
 log = logging.getLogger(__name__)
 
@@ -48,64 +49,21 @@ class FakeEarthCOGReader(COGReader):
         super().close()
 
 
+def post_process(elevation, mask):
+    rgb = data_to_rgb(elevation[0], -10000, 0.1)
+    return rgb, mask
+
+
+# Can't figure out why subclassing doesn't work properly for COGReader...
 class ElevationReader(FakeEarthCOGReader):
-    def part(
-        self,
-        bbox: BBox,
-        dst_crs: Optional[CRS] = None,
-        bounds_crs: CRS = WGS84_CRS,
-        indexes: Optional[Union[int, Sequence]] = None,
-        expression: Optional[str] = None,
-        max_size: Optional[int] = None,
-        height: Optional[int] = None,
-        width: Optional[int] = None,
-        **kwargs: Any,
-    ) -> ImageData:
-        """Read part of a COG.
-        Args:
-            bbox (tuple): Output bounds (left, bottom, right, top) in target crs ("dst_crs").
-            dst_crs (rasterio.crs.CRS, optional): Overwrite target coordinate reference system.
-            bounds_crs (rasterio.crs.CRS, optional): Bounds Coordinate Reference System. Defaults to `epsg:4326`.
-            indexes (sequence of int or int, optional): Band indexes.
-            expression (str, optional): rio-tiler expression (e.g. b1/b2+b3).
-            max_size (int, optional): Limit the size of the longest dimension of the dataset read, respecting bounds X/Y aspect ratio.
-            height (int, optional): Output height of the array.
-            width (int, optional): Output width of the array.
-            kwargs (optional): Options to forward to the `rio_tiler.reader.part` function.
-        Returns:
-            rio_tiler.models.ImageData: ImageData instance with data, mask and input spatial info.
-        """
-        kwargs = {**self._kwargs, **kwargs}
+    def tile(self, *args, **kwargs):
+        return super().tile(*args, **kwargs, post_process=post_process)
 
-        if not dst_crs:
-            dst_crs = bounds_crs
+    def preview(self, *args, **kwargs):
+        return super().preview(*args, **kwargs, post_process=post_process)
 
-        data, mask = part(
-            self.dataset,
-            bbox,
-            max_size=max_size,
-            width=width,
-            height=height,
-            bounds_crs=bounds_crs,
-            dst_crs=dst_crs,
-            indexes=indexes,
-            **kwargs,
-        )
-
-        if bounds_crs and bounds_crs != dst_crs:
-            bbox = transform_bounds(bounds_crs, dst_crs, *bbox, densify_pts=21)
-
-        res = data_to_rgb(data, -10000, 0.1)
-        log.info(data)
-        log.info(res)
-
-        return ImageData(
-            res,
-            mask,
-            bounds=bbox,
-            crs=dst_crs,
-            assets=[self.input],
-        )
+    def part(self, *args, **kwargs):
+        return super().part(*args, **kwargs, post_process=post_process)
 
 
 def get_cog_info(src_path: str, cog: COGReader):

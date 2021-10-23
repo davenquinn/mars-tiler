@@ -16,6 +16,7 @@ ipython = "^7.28.0"
 rio-rgbify = "^0.3.2"
 
 [tool.poetry.dev-dependencies]
+debugpy = "^1.5.1"
 
 [tool.poetry.scripts]
 tile-server = "mars_tile_server:cli"
