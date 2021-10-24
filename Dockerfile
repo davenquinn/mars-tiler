@@ -20,6 +20,10 @@ RUN --mount=type=cache,target=/root/.cache \
 
 EXPOSE 8000
 
+ENV GDAL_DISABLE_READDIR_ON_OPEN EMPTY_DIR
+ENV GDAL_HTTP_MULTIPLEX YES
+ENV GDAL_HTTP_VERSION 2
+
 # Creating folders, and files for a project:
 COPY . /code
 

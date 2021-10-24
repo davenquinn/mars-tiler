@@ -51,14 +51,13 @@ def post_process(elevation, mask):
 
 # Can't figure out why subclassing doesn't work properly for COGReader...
 class ElevationReader(FakeEarthCOGReader):
-    def tile(self, *args, **kwargs):
-        return super().tile(*args, **kwargs, post_process=post_process)
-
     def preview(self, *args, **kwargs):
-        return super().preview(*args, **kwargs, post_process=post_process)
+        kwargs["post_process"] = post_process
+        return super().preview(*args, **kwargs)
 
     def part(self, *args, **kwargs):
-        return super().part(*args, **kwargs, post_process=post_process)
+        kwargs["post_process"] = post_process
+        return super().part(*args, **kwargs)
 
 
 def get_cog_info(src_path: str, cog: COGReader):

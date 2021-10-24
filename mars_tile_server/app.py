@@ -9,6 +9,7 @@ from titiler.mosaic.errors import MOSAIC_STATUS_CODES
 from titiler.core.factory import TilerFactory
 from titiler.core.dependencies import DatasetParams, RenderParams
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
+from titiler.core.resources.enums import OptionalHeader
 from .util import ElevationReader, FakeEarthCOGReader
 
 
@@ -16,7 +17,11 @@ def build_path():
     return "/mars-data/hirise-images/hirise-red.mosaic.json"
 
 
-mosaic = MosaicTilerFactory(reader=MosaicBackend, path_dependency=build_path)
+headers = {OptionalHeader.server_timing, OptionalHeader.x_assets}
+
+mosaic = MosaicTilerFactory(
+    reader=MosaicBackend, path_dependency=build_path, optional_headers=headers
+)
 
 app = FastAPI(title="Mars tile server")
 
@@ -25,8 +30,12 @@ def elevation_path():
     return "/mars-data/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif"
 
 
-cog = TilerFactory(path_dependency=elevation_path, reader=FakeEarthCOGReader)
-cog_elevation = TilerFactory(path_dependency=elevation_path, reader=ElevationReader)
+cog = TilerFactory(
+    path_dependency=elevation_path, reader=FakeEarthCOGReader, optional_headers=headers
+)
+cog_elevation = TilerFactory(
+    path_dependency=elevation_path, reader=ElevationReader, optional_headers=headers
+)
 
 
 app.include_router(mosaic.router, tags=["HiRISE Mosaic"], prefix="/hirise-mosaic")
