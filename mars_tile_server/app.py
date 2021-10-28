@@ -19,8 +19,14 @@ def build_path():
 
 headers = {OptionalHeader.server_timing, OptionalHeader.x_assets}
 
+
+def MarsMosaicBackend(*args, **kwargs):
+    kwargs["reader"] = FakeEarthCOGReader
+    return MosaicBackend(*args, **kwargs)
+
+
 mosaic = MosaicTilerFactory(
-    reader=MosaicBackend, path_dependency=build_path, optional_headers=headers
+    reader=MarsMosaicBackend, path_dependency=build_path, optional_headers=headers
 )
 
 app = FastAPI(title="Mars tile server")

@@ -15,6 +15,7 @@ EARTH_RADIUS = 6378137
 def fake_earth_crs(crs: CRS) -> CRS:
     data = crs.to_dict()
     radius = data.get("R", None)
+
     if radius is None:
         raise AttributeError(
             "Error faking Earth CRS: Input does not have 'R' parameter..."
@@ -36,7 +37,10 @@ class FakeEarthCOGReader(COGReader):
             self.src_dst = rasterio.open(src_path)
         else:
             self.src_dst = dataset
-        dataset = WarpedVRT(self.src_dst, src_crs=fake_earth_crs(self.src_dst.crs))
+        dtype = kwargs.pop("dtype", None)
+        dataset = WarpedVRT(
+            self.src_dst, src_crs=fake_earth_crs(self.src_dst.crs), dtype=dtype
+        )
         super().__init__(None, dataset, *args, **kwargs)
 
     def close(self):
@@ -86,7 +90,7 @@ def get_cog_info(src_path: str, cog: COGReader):
     }
 
 
-def get_dataset_info(src_path: str) -> Dict:
+def get_dataset_info(src_path: str, **kwargs) -> Dict:
     """Get rasterio dataset meta, faking an Earth CRS internally as needed."""
-    with FakeEarthCOGReader(src_path, dataset=src_path) as cog:
+    with FakeEarthCOGReader(src_path, dataset=src_path, **kwargs) as cog:
         return get_cog_info(str(src_path), cog)
