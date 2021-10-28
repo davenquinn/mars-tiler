@@ -68,13 +68,24 @@ def create_mosaic(
     file_list: Optional[Path] = None,
     dry_run: bool = None,
     dtype: str = None,
+    quadkey_zoom: int = None,
 ):
     if file_list is not None:
-        files = [Path(f.strip()) for f in file_list.open().readlines()]
+        files = [
+            Path(f.strip())
+            for f in file_list.open().readlines()
+            if not f.startswith("#")
+        ]
 
     files = ensure_absolute_paths(*files)
+    files = list(files)
+    files.reverse()
+    for f in files:
+        print(str(f))
 
     features = get_footprints(files, quiet=quiet, dtype=dtype)
+
+    features
 
     if dry_run:
         for f in features:
@@ -82,7 +93,7 @@ def create_mosaic(
         return
 
     minzoom = None
-    maxzoom = 8
+    maxzoom = None
 
     if minzoom is None:
         data_minzoom = {feat["properties"]["minzoom"] for feat in features}
@@ -103,13 +114,22 @@ def create_mosaic(
 
         maxzoom = max(data_maxzoom)
 
+    if quadkey_zoom is None:
+        quadkey_zoom = maxzoom
+
+    print(f"Getting data in zoom range {minzoom}, {maxzoom}")
+
     datatype = {feat["properties"]["datatype"] for feat in features}
     if len(datatype) > 1:
         print(datatype)
         raise Exception("Datasets should have the same data type")
 
     mosaic = MosaicJSON._create_mosaic(
-        features, minzoom=minzoom, maxzoom=maxzoom, quiet=quiet, minimum_tile_cover=0.25
+        features,
+        minzoom=minzoom,
+        maxzoom=maxzoom,
+        quiet=quiet,
+        quadkey_zoom=quadkey_zoom,
     )
 
     with MosaicBackend(str(output), mosaic_def=mosaic) as mosaic:
