@@ -11,6 +11,7 @@ from titiler.core.dependencies import DatasetParams, RenderParams
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 from titiler.core.resources.enums import OptionalHeader
 from .util import ElevationReader, FakeEarthCOGReader
+from .database import db
 
 
 def build_path():

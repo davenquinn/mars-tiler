@@ -11,7 +11,10 @@ RUN apt-get update && \
   rm -rf /var/lib/apt/lists/* && \
   poetry config virtualenvs.create false
 
+# First, install python tools
 COPY ./python-tools /python-tools
+WORKDIR /python-tools/birdbrain
+RUN poetry install --no-interaction --no-ansi
 
 ENV PIP_DEFAULT_TIMEOUT=100 \
   PIP_DISABLE_PIP_VERSION_CHECK=1
@@ -21,8 +24,7 @@ COPY ./tools/tile-server/poetry.lock ./tools/tile-server/pyproject.toml /tools/t
 
 # Project initialization:
 WORKDIR /tools/tile-server
-RUN --mount=type=cache,target=/root/.cache \
-  poetry install --no-interaction --no-ansi
+RUN poetry install --no-interaction --no-ansi --no-root
 
 EXPOSE 8000
 

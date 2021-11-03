@@ -5,9 +5,10 @@ name = "mars-tile-server"
 version = "0.1.0"
 
 [tool.poetry.dependencies]
-birdbrain = {path = "../../python-tools/birdbrain"}
+birdbrain = ""
 cogeo-mosaic = "^3.0.2"
 ipython = "^7.28.0"
+"macrostrat.core_utils" = ""
 python = "^3.8"
 rich = "^10.12.0"
 rio-rgbify = "^0.3.2"
@@ -17,7 +18,9 @@ typer = "^0.4.0"
 uvicorn = "^0.15.0"
 
 [tool.poetry.dev-dependencies]
+birdbrain = {path = "../../python-tools/birdbrain", develop = true}
 debugpy = "^1.5.1"
+"macrostrat.core_utils" = {path = "../../python-tools/core-utils", develop = true}
 
 [tool.poetry.scripts]
 tile-server = "mars_tile_server:cli"
