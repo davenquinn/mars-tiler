@@ -1,24 +1,24 @@
 import os
 import sys
 import click
+from typer import Typer
 
 from rich import print
 from cogeo_mosaic.utils import _filter_futures
 from cogeo_mosaic.mosaic import MosaicJSON
 from cogeo_mosaic.backends import MosaicBackend
-import typer
 from typing import Sequence, List, Optional
 from pathlib import Path
 from concurrent import futures
 import warnings
 
-from .util import get_dataset_info
+from ..util import get_dataset_info
 
-cli = typer.Typer()
+mosaic_cli = Typer()
 
 
 def get_footprints(
-    dataset_list: Sequence[Path], max_threads: int = 20, quiet: bool = True, **kwargs
+    dataset_list: Sequence[Path], max_threads: int = 20, quiet: bool = False, **kwargs
 ) -> List:
     """
     Create footprint GeoJSON.
@@ -49,7 +49,7 @@ def get_footprints(
             for _ in future:
                 pass
 
-    return list(_filter_futures(future_work))
+    return _filter_futures(future_work)
 
 
 def ensure_absolute_paths(*paths: Path):
@@ -60,7 +60,7 @@ def ensure_absolute_paths(*paths: Path):
             yield path
 
 
-@cli.command(name="create-mosaic")
+@mosaic_cli.command(name="create-mosaic")
 def create_mosaic(
     output: Path,
     files: Optional[List[Path]] = [],
