@@ -1,5 +1,5 @@
 from os import environ
-from birdbrain import Database
+from sparrow.birdbrain import Database
 
 dbname = environ.get("FOOTPRINTS_DATABASE")
 db = Database(dbname)

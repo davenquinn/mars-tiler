@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS imagery.dataset (
   name text UNIQUE,
   path text UNIQUE,
   mosaic text REFERENCES imagery.mosaic(name),
+  minzoom integer,
+  maxzoom integer,
   dtype text,
   footprint geometry(Polygon, 949900)
 );
