@@ -12,44 +12,20 @@ from pathlib import Path
 from concurrent import futures
 import warnings
 
+from sparrow.utils import get_logger
 from ..util import get_dataset_info
+
+log = get_logger()
 
 mosaic_cli = Typer()
 
 
-def get_footprints(
-    dataset_list: Sequence[Path], max_threads: int = 20, quiet: bool = False, **kwargs
-) -> List:
-    """
-    Create footprint GeoJSON.
-    Attributes
-    ----------
-    dataset_listurl : tuple or list, required
-        Dataset urls.
-    max_threads : int
-        Max threads to use (default: 20).
-    Returns
-    -------
-    out : tuple
-        tuple of footprint feature.
-    """
-    fout = os.devnull if quiet else sys.stderr
-    with futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
-        future_work = [
-            executor.submit(lambda x: get_dataset_info(x, **kwargs), item)
-            for item in dataset_list
-        ]
-        with click.progressbar(  # type: ignore
-            futures.as_completed(future_work),
-            file=fout,
-            length=len(future_work),
-            label="Get footprints",
-            show_percent=True,
-        ) as future:
-            for _ in future:
-                pass
-
-    return _filter_futures(future_work)
+def get_footprints(dataset_list: Sequence[Path], **kwargs) -> List:
+    for item in dataset_list:
+        try:
+            yield get_dataset_info(item, **kwargs)
+        except Exception as err:
+            log.warning(str(err))
 
 
 def ensure_absolute_paths(*paths: Path):
