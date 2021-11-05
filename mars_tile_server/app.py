@@ -12,6 +12,7 @@ from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 from titiler.core.resources.enums import OptionalHeader
 from .util import ElevationReader, FakeEarthCOGReader
 from .database import db
+from morecantile import tms, Tile
 
 
 def build_path():
@@ -84,6 +85,16 @@ hirise_cog = TilerFactory(
     render_dependency=HiRISERenderParams,
 )
 app.include_router(hirise_cog.router, tags=["HiRISE images"], prefix="/hirise")
+
+mercator = tms.get("WebMercatorQuad")
+
+
+@app.get("/datasets/{mosaic}")
+async def read_item(mosaic: str, lon: float = None, lat: float = None, zoom: int = 5):
+    tile = tms._tile(lon, lat, 4)
+    bounds = tms.xy_bounds(tile)
+    return bounds
+
 
 add_exception_handlers(app, DEFAULT_STATUS_CODES)
 add_exception_handlers(app, MOSAIC_STATUS_CODES)
