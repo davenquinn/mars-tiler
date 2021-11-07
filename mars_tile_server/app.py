@@ -11,8 +11,10 @@ from titiler.core.dependencies import DatasetParams, RenderParams
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 from titiler.core.resources.enums import OptionalHeader
 from .util import ElevationReader, FakeEarthCOGReader
-from .database import db
+from .database import get_database
 from morecantile import tms, Tile
+from geoalchemy2.functions import ST_MakeEnvelope, ST_SetSRID
+from sqlalchemy import and_
 
 
 def build_path():
@@ -90,10 +92,32 @@ mercator = tms.get("WebMercatorQuad")
 
 
 @app.get("/datasets/{mosaic}")
-async def read_item(mosaic: str, lon: float = None, lat: float = None, zoom: int = 5):
-    tile = tms._tile(lon, lat, 4)
-    bounds = tms.xy_bounds(tile)
-    return bounds
+async def dataset(mosaic: str, lon: float = None, lat: float = None, zoom: int = 4):
+    tile = mercator.tile(lon, lat, zoom)
+    xy_bounds = mercator.xy_bounds(tile)
+    bounds = mercator.bounds(tile)
+
+    db = get_database()
+
+    Dataset = db.model.imagery_dataset
+
+    datasets = (
+        db.session.query(Dataset)
+        .filter(Dataset.mosaic == mosaic)
+        .filter(
+            Dataset.footprint.ST_Intersects(
+                ST_SetSRID(ST_MakeEnvelope(*bounds), 949900)
+            )
+        )
+        .filter(and_(Dataset.minzoom <= zoom, zoom <= Dataset.maxzoom))
+    )
+
+    return {
+        "mercator_bounds": xy_bounds,
+        "latlng_bounds": bounds,
+        "tile": tile,
+        "datasets": [d.path for d in datasets],
+    }
 
 
 add_exception_handlers(app, DEFAULT_STATUS_CODES)

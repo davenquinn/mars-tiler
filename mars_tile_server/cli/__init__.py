@@ -9,7 +9,7 @@ from shapely.geometry import shape
 from sparrow.utils import relative_path
 from sparrow.dinosaur import Dinosaur
 
-from ..database import db
+from ..database import get_database
 from .mosaic import mosaic_cli, get_footprints
 
 import logging
@@ -37,11 +37,7 @@ def create_tables():
 def update_footprints(
     datasets: List[Path], mosaic: Optional[str] = None, update: bool = False
 ):
-    db.automap()
-    # We seem to have to remap public for changes to take hold...
-    db.mapper.reflect_schema("public")
-    db.mapper.reflect_schema("imagery")
-    db.mapper.reflect_schema("public")
+    db = get_database()
 
     Dataset = db.model.imagery_dataset
 
@@ -78,6 +74,7 @@ class Migrator(Dinosaur):
 
 @cli.command(name="migrate")
 def migrate(force: bool = False):
+    db = get_database()
     kwargs = dict(dry_run=False, apply=False)
     if force:
         kwargs["apply"] = True
