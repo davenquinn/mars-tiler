@@ -47,4 +47,4 @@ COPY ./python-tools /python-tools/
 COPY ./tools/tile-server /tools/tile-server/
 
 # Install the root package
-RUN poetry install --no-interaction --no-ansi 
+RUN poetry install --no-interaction --no-ansi

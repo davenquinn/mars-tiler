@@ -53,9 +53,8 @@ def build_footprints(
         path = Path(f["properties"]["path"]).absolute()
 
         kw = dict(
-            footprint=from_shape(shape(f["geometry"])),
+            footprint=from_shape(shape(f["geometry"]), 949900),
             path=str(path),
-            name=path.stem,
             minzoom=f["properties"]["minzoom"],
             maxzoom=f["properties"]["maxzoom"],
             dtype=f["properties"]["datatype"],
@@ -64,7 +63,7 @@ def build_footprints(
         if mosaic is not None:
             kw["mosaic"] = mosaic
 
-        db.get_or_create(Dataset, **kw)
+        db.get_or_create(Dataset, name=path.stem, defaults=kw)
 
         db.session.commit()
 

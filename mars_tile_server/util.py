@@ -1,8 +1,12 @@
-from typing import Dict
+from typing import Dict, Tuple
 from rio_tiler.io import COGReader
+import warnings
+from rio_tiler.errors import NoOverviewWarning
 from rasterio.vrt import WarpedVRT
 from rasterio.crs import CRS
 from rio_rgbify.encoders import data_to_rgb
+from rasterio.warp import calculate_default_transform, transform_bounds
+from rasterio.rio.overview import get_maximum_overview_level
 import rasterio
 import logging
 
@@ -91,7 +95,69 @@ def get_cog_info(src_path: str, cog: COGReader):
     }
 
 
+class MarsCOGReader(COGReader):
+    def __attrs_post_init__(self):
+        """Define _kwargs, open dataset and get info."""
+        if self.nodata is not None:
+            self._kwargs["nodata"] = self.nodata
+        if self.unscale is not None:
+            self._kwargs["unscale"] = self.unscale
+        if self.resampling_method is not None:
+            self._kwargs["resampling_method"] = self.resampling_method
+        if self.vrt_options is not None:
+            self._kwargs["vrt_options"] = self.vrt_options
+        if self.post_process is not None:
+            self._kwargs["post_process"] = self.post_process
+
+        self.dataset = self.dataset or rasterio.open(self.filepath)
+
+        self.nodata = self.nodata if self.nodata is not None else self.dataset.nodata
+
+        # self.bounds = self.dataset.bounds
+        WGS84_CRS = CRS.from_dict({"proj": "longlat", "R": 3396190, "no_defs": True})
+        self.bounds = transform_bounds(
+            self.dataset.crs, WGS84_CRS, *self.dataset.bounds, densify_pts=21
+        )
+        if self.minzoom is None or self.maxzoom is None:
+            self._set_zooms()
+
+        if self.colormap is None:
+            self._get_colormap()
+
+        if min(
+            self.dataset.width, self.dataset.height
+        ) > 512 and not self.dataset.overviews(1):
+            warnings.warn(
+                "The dataset has no Overviews. rio-tiler performances might be impacted.",
+                NoOverviewWarning,
+            )
+
+    def get_zooms(self, tilesize: int = 256) -> Tuple[int, int]:
+        """Calculate raster min/max zoom level."""
+        if self.dataset.crs != self.tms.crs:
+            dst_affine, w, h = calculate_default_transform(
+                fake_earth_crs(self.dataset.crs),
+                self.tms.crs,
+                self.dataset.width,
+                self.dataset.height,
+                *self.dataset.bounds,
+            )
+        else:
+            dst_affine = list(self.dataset.transform)
+            w = self.dataset.width
+            h = self.dataset.height
+
+        resolution = max(abs(dst_affine[0]), abs(dst_affine[4]))
+        maxzoom = self.tms.zoom_for_res(resolution)
+
+        overview_level = get_maximum_overview_level(w, h, minsize=tilesize)
+        ovr_resolution = resolution * (2 ** overview_level)
+        minzoom = self.tms.zoom_for_res(ovr_resolution)
+
+        return minzoom, maxzoom
+
+
 def get_dataset_info(src_path: str, **kwargs) -> Dict:
     """Get rasterio dataset meta, faking an Earth CRS internally as needed."""
-    with COGReader(src_path, **kwargs) as cog:
+    with MarsCOGReader(src_path, **kwargs) as cog:
         return get_cog_info(str(src_path), cog)
