@@ -15,7 +15,7 @@ from .mosaic import mosaic_cli, get_footprints
 import logging
 import sys
 
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+# logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 cli = Typer()
 
@@ -33,34 +33,39 @@ def create_tables():
     initialize_database()
 
 
-@cli.command(name="update-footprints")
-def update_footprints(
-    datasets: List[Path], mosaic: Optional[str] = None, update: bool = False
+@cli.command(name="build-footprints")
+def build_footprints(
+    datasets: List[Path] = [], mosaic: Optional[str] = None, update: bool = False
 ):
     db = get_database()
 
     Dataset = db.model.imagery_dataset
 
     _datasets = datasets
-    if not update:
-        ds_ids = db.session.query(Dataset.name).all()
-        _datasets = (d for d in datasets if d.stem not in ds_ids)
+    if update:
+        datasets = db.session.query(Dataset)
+        if mosaic is not None:
+            datasets = datasets.filter(Dataset.mosaic == mosaic)
+        _datasets = (Path(d.path) for d in datasets.all())
 
     footprints = get_footprints(_datasets)
     for f in footprints:
-
         path = Path(f["properties"]["path"]).absolute()
 
-        dataset = Dataset(
+        kw = dict(
             footprint=from_shape(shape(f["geometry"])),
             path=str(path),
             name=path.stem,
             minzoom=f["properties"]["minzoom"],
             maxzoom=f["properties"]["maxzoom"],
             dtype=f["properties"]["datatype"],
-            mosaic=mosaic,
         )
-        db.session.add(dataset)
+
+        if mosaic is not None:
+            kw["mosaic"] = mosaic
+
+        db.get_or_create(Dataset, **kw)
+
         db.session.commit()
 
 

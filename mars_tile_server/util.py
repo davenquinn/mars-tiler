@@ -66,6 +66,7 @@ class ElevationReader(FakeEarthCOGReader):
 
 def get_cog_info(src_path: str, cog: COGReader):
     bounds = cog.bounds
+    print(bounds)
     return {
         "geometry": {
             "type": "Polygon",
@@ -92,5 +93,5 @@ def get_cog_info(src_path: str, cog: COGReader):
 
 def get_dataset_info(src_path: str, **kwargs) -> Dict:
     """Get rasterio dataset meta, faking an Earth CRS internally as needed."""
-    with FakeEarthCOGReader(src_path, dataset=src_path, **kwargs) as cog:
+    with COGReader(src_path, **kwargs) as cog:
         return get_cog_info(str(src_path), cog)

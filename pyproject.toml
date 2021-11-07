@@ -5,7 +5,7 @@ name = "mars-tile-server"
 version = "0.1.0"
 
 [tool.poetry.dependencies]
-birdbrain = ""
+Shapely = "^1.8.0"
 cogeo-mosaic = "^3.0.2"
 ipython = "^7.28.0"
 python = "^3.8"
@@ -18,7 +18,6 @@ rio-tiler = "^2.1.3"
 titiler = "^0.3.11"
 typer = "^0.4.0"
 uvicorn = "^0.15.0"
-Shapely = "^1.8.0"
 
 [tool.poetry.dev-dependencies]
 debugpy = "^1.5.1"

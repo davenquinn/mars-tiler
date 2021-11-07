@@ -12,6 +12,7 @@ from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 from titiler.core.resources.enums import OptionalHeader
 from .util import ElevationReader, FakeEarthCOGReader
 from .database import get_database
+from .mosaic import CustomMosaicBackend
 from morecantile import tms, Tile
 from geoalchemy2.functions import ST_MakeEnvelope, ST_SetSRID
 from sqlalchemy import and_
@@ -48,6 +49,13 @@ cog_elevation = TilerFactory(
 )
 
 
+elevation_mosaic = MosaicTilerFactory(
+    path_dependency=elevation_path, reader=CustomMosaicBackend, optional_headers=headers
+)
+
+app.include_router(
+    elevation_mosaic.router, tags=["Elevation Mosaic"], prefix="/elevation-mosaic"
+)
 app.include_router(mosaic.router, tags=["HiRISE Mosaic"], prefix="/hirise-mosaic")
 app.include_router(cog.router, tags=["Global DEM"], prefix="/global-dem")
 app.include_router(
@@ -109,7 +117,8 @@ async def dataset(mosaic: str, lon: float = None, lat: float = None, zoom: int =
                 ST_SetSRID(ST_MakeEnvelope(*bounds), 949900)
             )
         )
-        .filter(and_(Dataset.minzoom <= zoom, zoom <= Dataset.maxzoom))
+        .filter(Dataset.minzoom <= zoom)
+        # .filter(and_(Dataset.minzoom <= zoom, zoom <= Dataset.maxzoom))
     )
 
     return {

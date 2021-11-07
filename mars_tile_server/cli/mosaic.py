@@ -22,10 +22,7 @@ mosaic_cli = Typer()
 
 def get_footprints(dataset_list: Sequence[Path], **kwargs) -> List:
     for item in dataset_list:
-        try:
-            yield get_dataset_info(item, **kwargs)
-        except Exception as err:
-            log.warning(str(err))
+        yield get_dataset_info(item, **kwargs)
 
 
 def ensure_absolute_paths(*paths: Path):
