@@ -63,7 +63,10 @@ def build_footprints(
         if mosaic is not None:
             kw["mosaic"] = mosaic
 
-        db.get_or_create(Dataset, name=path.stem, defaults=kw)
+        dataset = db.get_or_create(Dataset, name=path.stem)
+        for k, v in kw.items():
+            setattr(dataset, k, v)
+        db.session.add(dataset)
 
         db.session.commit()
 
