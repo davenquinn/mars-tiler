@@ -9,7 +9,7 @@ from rasterio.warp import calculate_default_transform, transform_bounds
 from rasterio.rio.overview import get_maximum_overview_level
 import rasterio
 import logging
-from .defs import MARS2000_SPHERE
+from .defs import mars_tms, MARS2000_SPHERE
 
 log = logging.getLogger(__name__)
 
@@ -110,6 +110,7 @@ class MarsCOGReader(COGReader):
         if self.post_process is not None:
             self._kwargs["post_process"] = self.post_process
 
+        self.tms = mars_tms
         self.dataset = self.dataset or rasterio.open(self.filepath)
 
         self.nodata = self.nodata if self.nodata is not None else self.dataset.nodata
@@ -136,7 +137,7 @@ class MarsCOGReader(COGReader):
         """Calculate raster min/max zoom level."""
         if self.dataset.crs != self.tms.crs:
             dst_affine, w, h = calculate_default_transform(
-                fake_earth_crs(self.dataset.crs),
+                self.dataset.crs,
                 self.tms.crs,
                 self.dataset.width,
                 self.dataset.height,

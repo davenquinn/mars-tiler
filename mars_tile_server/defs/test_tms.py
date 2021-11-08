@@ -30,7 +30,7 @@ def _test_tms(tms: TileMatrixSet, pos: PositionTest):
 
 @mark.parametrize("pos", positions)
 def test_positions(pos):
-    """Should have correct positions on Earth"""
+    """Should have correct positions with standard web mercator"""
     _test_tms(mercator_tms, pos)
 
 
