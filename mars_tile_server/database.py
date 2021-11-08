@@ -2,7 +2,7 @@ from os import environ
 from sparrow.birdbrain import Database
 
 dbname = environ.get("FOOTPRINTS_DATABASE")
-_db = Database(dbname)
+_db = Database(dbname, echo_sql=False)
 
 
 def get_database():

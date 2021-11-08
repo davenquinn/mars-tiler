@@ -35,7 +35,7 @@ def create_tables():
 
 @cli.command(name="build-footprints")
 def build_footprints(
-    datasets: List[Path] = [], mosaic: Optional[str] = None, update: bool = False
+    datasets: List[Path], mosaic: Optional[str] = None, update: bool = False
 ):
     db = get_database()
 

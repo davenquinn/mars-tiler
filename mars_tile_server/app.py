@@ -11,11 +11,13 @@ from titiler.core.dependencies import DatasetParams, RenderParams
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 from titiler.core.resources.enums import OptionalHeader
 from .util import ElevationReader, FakeEarthCOGReader
-from .database import get_database
-from .mosaic import CustomMosaicBackend
-from morecantile import tms, Tile
-from geoalchemy2.functions import ST_MakeEnvelope, ST_SetSRID
-from sqlalchemy import and_
+from .mosaic import (
+    CustomMosaicBackend,
+    ElevationMosaicBackend,
+    get_datasets,
+    mercator_tms,
+)
+from morecantile import Tile
 
 
 def build_path():
@@ -30,8 +32,8 @@ def MarsMosaicBackend(*args, **kwargs):
     return MosaicBackend(*args, **kwargs)
 
 
-mosaic = MosaicTilerFactory(
-    reader=MarsMosaicBackend, path_dependency=build_path, optional_headers=headers
+hirise_mosaic = MosaicTilerFactory(
+    reader=CustomMosaicBackend, path_dependency=build_path, optional_headers=headers
 )
 
 app = FastAPI(title="Mars tile server")
@@ -39,6 +41,11 @@ app = FastAPI(title="Mars tile server")
 
 def elevation_path():
     return "/mars-data/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif"
+
+
+def elevation_mosaic_paths(x: int, y: int, z: int):
+    tile = Tile(x, y, z)
+    return [d.path for d in get_datasets(tile, "elevation_model")]
 
 
 cog = TilerFactory(
@@ -50,13 +57,17 @@ cog_elevation = TilerFactory(
 
 
 elevation_mosaic = MosaicTilerFactory(
-    path_dependency=elevation_path, reader=CustomMosaicBackend, optional_headers=headers
+    path_dependency=elevation_mosaic_paths,
+    reader=ElevationMosaicBackend,
+    optional_headers=headers,
 )
 
 app.include_router(
     elevation_mosaic.router, tags=["Elevation Mosaic"], prefix="/elevation-mosaic"
 )
-app.include_router(mosaic.router, tags=["HiRISE Mosaic"], prefix="/hirise-mosaic")
+app.include_router(
+    hirise_mosaic.router, tags=["HiRISE Mosaic"], prefix="/hirise-mosaic"
+)
 app.include_router(cog.router, tags=["Global DEM"], prefix="/global-dem")
 app.include_router(
     cog_elevation.router, tags=["Global RGB DEM"], prefix="/global-dem-rgb"
@@ -96,30 +107,14 @@ hirise_cog = TilerFactory(
 )
 app.include_router(hirise_cog.router, tags=["HiRISE images"], prefix="/hirise")
 
-mercator = tms.get("WebMercatorQuad")
-
 
 @app.get("/datasets/{mosaic}")
 async def dataset(mosaic: str, lon: float = None, lat: float = None, zoom: int = 4):
-    tile = mercator.tile(lon, lat, zoom)
-    xy_bounds = mercator.xy_bounds(tile)
-    bounds = mercator.bounds(tile)
+    tile = mercator_tms.tile(lon, lat, zoom)
+    xy_bounds = mercator_tms.xy_bounds(tile)
+    bounds = mercator_tms.bounds(tile)
 
-    db = get_database()
-
-    Dataset = db.model.imagery_dataset
-
-    datasets = (
-        db.session.query(Dataset)
-        .filter(Dataset.mosaic == mosaic)
-        .filter(
-            Dataset.footprint.ST_Intersects(
-                ST_SetSRID(ST_MakeEnvelope(*bounds), 949900)
-            )
-        )
-        .filter(Dataset.minzoom <= zoom)
-        # .filter(and_(Dataset.minzoom <= zoom, zoom <= Dataset.maxzoom))
-    )
+    datasets = get_datasets(tile, mosaic)
 
     return {
         "mercator_bounds": xy_bounds,
