@@ -50,6 +50,9 @@ def get_datasets(tile: Tile, mosaic: str):
 class CustomMosaicBackend(BaseBackend):
     mosaicid: str = "hirise_red"
 
+    def __attrs_post_init__(self):
+        self.reader = FakeEarthCOGReader
+
     @cached(
         TTLCache(maxsize=cache_config.maxsize, ttl=cache_config.ttl),
         key=lambda self, x, y, z: hashkey(self.mosaicid, x, y, z),

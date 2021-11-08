@@ -9,7 +9,7 @@ from rasterio.warp import calculate_default_transform, transform_bounds
 from rasterio.rio.overview import get_maximum_overview_level
 import rasterio
 import logging
-from .crs import MARS2000_SPHERE
+from .tms.crs import MARS2000_SPHERE
 
 log = logging.getLogger(__name__)
 
