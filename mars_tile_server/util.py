@@ -53,22 +53,6 @@ class FakeEarthCOGReader(COGReader):
         super().close()
 
 
-def post_process(elevation, mask):
-    rgb = data_to_rgb(elevation[0], -10000, 0.1)
-    return rgb, mask
-
-
-# Can't figure out why subclassing doesn't work properly for COGReader...
-class ElevationReader(FakeEarthCOGReader):
-    def preview(self, *args, **kwargs):
-        kwargs["post_process"] = post_process
-        return super().preview(*args, **kwargs)
-
-    def part(self, *args, **kwargs):
-        kwargs["post_process"] = post_process
-        return super().part(*args, **kwargs)
-
-
 def get_cog_info(src_path: str, cog: COGReader):
     bounds = cog.bounds
     print(bounds)
@@ -134,6 +118,21 @@ class MarsCOGReader(COGReader):
                 "The dataset has no Overviews. rio-tiler performances might be impacted.",
                 NoOverviewWarning,
             )
+
+
+def post_process(elevation, mask):
+    rgb = data_to_rgb(elevation[0], -10000, 0.1)
+    return rgb, mask
+
+
+class ElevationReader(MarsCOGReader):
+    def preview(self, *args, **kwargs):
+        kwargs["post_process"] = post_process
+        return super().preview(*args, **kwargs)
+
+    def part(self, *args, **kwargs):
+        kwargs["post_process"] = post_process
+        return super().part(*args, **kwargs)
 
 
 def get_dataset_info(src_path: str, **kwargs) -> Dict:

@@ -10,13 +10,14 @@ from titiler.core.factory import TilerFactory
 from titiler.core.dependencies import DatasetParams, RenderParams
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 from titiler.core.resources.enums import OptionalHeader
-from .util import ElevationReader, FakeEarthCOGReader
+from .util import ElevationReader, MarsCOGReader
 from .mosaic import (
-    CustomMosaicBackend,
+    MarsMosaicBackend,
     ElevationMosaicBackend,
     get_datasets,
     mercator_tms,
 )
+from .database import get_database
 from morecantile import Tile
 
 
@@ -28,12 +29,12 @@ headers = {OptionalHeader.server_timing, OptionalHeader.x_assets}
 
 
 def MarsMosaicBackend(*args, **kwargs):
-    kwargs["reader"] = FakeEarthCOGReader
+    kwargs["reader"] = MarsCOGReader
     return MosaicBackend(*args, **kwargs)
 
 
 hirise_mosaic = MosaicTilerFactory(
-    reader=CustomMosaicBackend, path_dependency=build_path, optional_headers=headers
+    reader=MarsMosaicBackend, path_dependency=build_path, optional_headers=headers
 )
 
 app = FastAPI(title="Mars tile server")
@@ -49,7 +50,7 @@ def elevation_mosaic_paths(x: int, y: int, z: int):
 
 
 cog = TilerFactory(
-    path_dependency=elevation_path, reader=FakeEarthCOGReader, optional_headers=headers
+    path_dependency=elevation_path, reader=MarsCOGReader, optional_headers=headers
 )
 cog_elevation = TilerFactory(
     path_dependency=elevation_path, reader=ElevationReader, optional_headers=headers
@@ -100,7 +101,7 @@ class HiRISERenderParams(RenderParams):
 
 
 hirise_cog = TilerFactory(
-    reader=FakeEarthCOGReader,
+    reader=MarsCOGReader,
     path_dependency=HiRISEParams,
     dataset_dependency=HiRISEImageParams,
     render_dependency=HiRISERenderParams,

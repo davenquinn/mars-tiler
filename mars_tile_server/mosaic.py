@@ -6,7 +6,7 @@ from cogeo_mosaic.backends.utils import find_quadkeys
 from cogeo_mosaic.cache import cache_config
 from cogeo_mosaic.backends import BaseBackend
 from morecantile import tms, Tile
-from .util import FakeEarthCOGReader, ElevationReader
+from .util import FakeEarthCOGReader, ElevationReader, MarsCOGReader
 import attr
 
 from typing import List
@@ -47,11 +47,11 @@ def get_datasets(tile: Tile, mosaic: str):
 
 
 @attr.s
-class CustomMosaicBackend(BaseBackend):
+class MarsMosaicBackend(BaseBackend):
     mosaicid: str = "hirise_red"
 
     def __attrs_post_init__(self):
-        self.reader = FakeEarthCOGReader
+        self.reader = MarsCOGReader
 
     @cached(
         TTLCache(maxsize=cache_config.maxsize, ttl=cache_config.ttl),
@@ -74,7 +74,7 @@ class CustomMosaicBackend(BaseBackend):
 
 
 @attr.s
-class ElevationMosaicBackend(CustomMosaicBackend):
+class ElevationMosaicBackend(MarsMosaicBackend):
     mosaicid: str = "elevation_model"
 
     def __attrs_post_init__(self):
