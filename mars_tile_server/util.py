@@ -9,6 +9,7 @@ from rasterio.warp import calculate_default_transform, transform_bounds
 from rasterio.rio.overview import get_maximum_overview_level
 import rasterio
 import logging
+from .crs import MARS2000_SPHERE
 
 log = logging.getLogger(__name__)
 
@@ -114,9 +115,8 @@ class MarsCOGReader(COGReader):
         self.nodata = self.nodata if self.nodata is not None else self.dataset.nodata
 
         # self.bounds = self.dataset.bounds
-        WGS84_CRS = CRS.from_dict({"proj": "longlat", "R": 3396190, "no_defs": True})
         self.bounds = transform_bounds(
-            self.dataset.crs, WGS84_CRS, *self.dataset.bounds, densify_pts=21
+            self.dataset.crs, MARS2000_SPHERE, *self.dataset.bounds, densify_pts=21
         )
         if self.minzoom is None or self.maxzoom is None:
             self._set_zooms()
