@@ -97,6 +97,8 @@ def get_cog_info(src_path: str, cog: COGReader):
 
 
 class MarsCOGReader(COGReader):
+    tms = mars_tms
+    # Note: we can probably get rid of this with rio-tiler v3
     def __attrs_post_init__(self):
         """Define _kwargs, open dataset and get info."""
         if self.nodata is not None:
@@ -132,30 +134,6 @@ class MarsCOGReader(COGReader):
                 "The dataset has no Overviews. rio-tiler performances might be impacted.",
                 NoOverviewWarning,
             )
-
-    def get_zooms(self, tilesize: int = 256) -> Tuple[int, int]:
-        """Calculate raster min/max zoom level."""
-        if self.dataset.crs != self.tms.crs:
-            dst_affine, w, h = calculate_default_transform(
-                self.dataset.crs,
-                self.tms.crs,
-                self.dataset.width,
-                self.dataset.height,
-                *self.dataset.bounds,
-            )
-        else:
-            dst_affine = list(self.dataset.transform)
-            w = self.dataset.width
-            h = self.dataset.height
-
-        resolution = max(abs(dst_affine[0]), abs(dst_affine[4]))
-        maxzoom = self.tms.zoom_for_res(resolution)
-
-        overview_level = get_maximum_overview_level(w, h, minsize=tilesize)
-        ovr_resolution = resolution * (2 ** overview_level)
-        minzoom = self.tms.zoom_for_res(ovr_resolution)
-
-        return minzoom, maxzoom
 
 
 def get_dataset_info(src_path: str, **kwargs) -> Dict:
