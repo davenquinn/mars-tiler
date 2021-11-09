@@ -8,6 +8,7 @@ from rio_rgbify.encoders import data_to_rgb
 from rasterio.warp import calculate_default_transform, transform_bounds
 from rasterio.rio.overview import get_maximum_overview_level
 import rasterio
+import numpy as N
 import logging
 from .defs import mars_tms, MARS2000_SPHERE
 
@@ -121,7 +122,9 @@ class MarsCOGReader(COGReader):
 
 
 def post_process(elevation, mask):
-    rgb = data_to_rgb(elevation[0], -10000, 0.1)
+    heights = elevation[0]
+    heights[mask] = 0
+    rgb = data_to_rgb(heights, -10000, 0.1)
     return rgb, mask
 
 

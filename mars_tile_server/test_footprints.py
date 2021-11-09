@@ -2,26 +2,23 @@
 
 from sparrow.utils import relative_path
 from pathlib import Path
-from .util import get_dataset_info
 from pytest import fixture, raises
 from shapely.geometry import Point, shape
 from rio_tiler.errors import TileOutsideBounds
 from morecantile import Tile
 from .defs import mars_tms
 from .util import MarsCOGReader
-
-fixtures = Path(relative_path(__file__, "..", "test-fixtures"))
+from ._test_utils import fixtures, dataset_footprint, _tile_geom
 
 
 @fixture
 def hirise_image():
-    return fixtures.resolve() / "ESP_037156_1800_RED.byte.tif"
+    return fixtures / "ESP_037156_1800_RED.byte.tif"
 
 
 @fixture
 def hirise_footprint(hirise_image):
-    info = get_dataset_info(hirise_image)
-    return shape(info["geometry"])
+    return dataset_footprint(hirise_image)
 
 
 @fixture
@@ -37,11 +34,6 @@ random_tile = Tile(5, 11, 11)
 
 def test_dataset_info(hirise_footprint):
     assert hirise_footprint.contains(hirise_center)
-
-
-def _tile_geom(tile):
-    feat = mars_tms.feature(tile)
-    return shape(feat["geometry"])
 
 
 def test_bad_tile(hirise_footprint):
