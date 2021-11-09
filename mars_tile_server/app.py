@@ -10,15 +10,14 @@ from titiler.core.factory import TilerFactory
 from titiler.core.dependencies import DatasetParams, RenderParams
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 from titiler.core.resources.enums import OptionalHeader
-from .util import ElevationReader, MarsCOGReader
+from .util import MarsCOGReader
 from .mosaic import (
     MarsMosaicBackend,
     ElevationMosaicBackend,
     get_datasets,
     mercator_tms,
+    elevation_path,
 )
-from .database import get_database
-from morecantile import Tile
 
 
 def build_path():
@@ -28,11 +27,6 @@ def build_path():
 headers = {OptionalHeader.server_timing, OptionalHeader.x_assets}
 
 
-def MarsMosaicBackend(*args, **kwargs):
-    kwargs["reader"] = MarsCOGReader
-    return MosaicBackend(*args, **kwargs)
-
-
 hirise_mosaic = MosaicTilerFactory(
     reader=MarsMosaicBackend, path_dependency=build_path, optional_headers=headers
 )
@@ -40,22 +34,14 @@ hirise_mosaic = MosaicTilerFactory(
 app = FastAPI(title="Mars tile server")
 
 
-def elevation_path():
-    return "/mars-data/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif"
-
-
 def elevation_mosaic_paths(x: int, y: int, z: int):
-    tile = Tile(x, y, z)
-    return [d.path for d in get_datasets(tile, "elevation_model")]
+    # tile = Tile(x, y, z)
+    return None
 
 
 cog = TilerFactory(
     path_dependency=elevation_path, reader=MarsCOGReader, optional_headers=headers
 )
-cog_elevation = TilerFactory(
-    path_dependency=elevation_path, reader=ElevationReader, optional_headers=headers
-)
-
 
 elevation_mosaic = MosaicTilerFactory(
     path_dependency=elevation_mosaic_paths,
@@ -70,9 +56,6 @@ app.include_router(
     hirise_mosaic.router, tags=["HiRISE Mosaic"], prefix="/hirise-mosaic"
 )
 app.include_router(cog.router, tags=["Global DEM"], prefix="/global-dem")
-app.include_router(
-    cog_elevation.router, tags=["Global RGB DEM"], prefix="/global-dem-rgb"
-)
 
 
 def HiRISEParams(
