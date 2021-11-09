@@ -47,16 +47,25 @@ class ElevationTestMosaicBackend(MarsTestMosaicBackend):
         return (im, assets)
 
 
-def test_basic_tiler(elevation_models):
-    test_tile = positions[0].tile
-    backend = MarsTestMosaicBackend(elevation_models)
-    tile_data = backend.tile(test_tile.x, test_tile.y, test_tile.z)
+@fixture
+def mosaic_backend(elevation_models):
+    return MarsTestMosaicBackend(elevation_models)
 
 
-def test_elevation_tiler(elevation_models):
+@fixture
+def elevation_backend(elevation_models):
+    return ElevationTestMosaicBackend(elevation_models)
+
+
+def test_basic_tiler(mosaic_backend):
     test_tile = positions[0].tile
-    backend = ElevationTestMosaicBackend(elevation_models)
-    tile_data, assets = backend.tile(test_tile.x, test_tile.y, test_tile.z)
+    tile_data, assets = mosaic_backend.tile(test_tile.x, test_tile.y, test_tile.z)
+    assert tile_data.data.shape == (1, 256, 256)
+
+
+def test_elevation_tiler(elevation_backend):
+    test_tile = positions[0].tile
+    tile_data, assets = elevation_backend.tile(test_tile.x, test_tile.y, test_tile.z)
     assert len(assets) == 2
     assert isinstance(tile_data, ImageData)
     assert tile_data.data.shape == (3, 256, 256)
