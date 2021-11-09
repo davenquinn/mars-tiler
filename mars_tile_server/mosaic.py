@@ -1,20 +1,19 @@
+from typing import List
 from cachetools import TTLCache, cached
 from cachetools.keys import hashkey
-from typing import List
 from cogeo_mosaic.mosaic import MosaicJSON
 from cogeo_mosaic.cache import cache_config
 from cogeo_mosaic.backends import BaseBackend
 from morecantile import tms, Tile
-from .util import MarsCOGReader, ElevationMixin, data_to_rgb
-import attr
-from .defs import mars_tms
-
-from typing import List
-
-from .database import get_database
 from geoalchemy2.functions import ST_MakeEnvelope, ST_SetSRID
 from sqlalchemy import and_, desc
 from sparrow.utils import get_logger
+
+import attr
+from .defs import mars_tms
+from .util import MarsCOGReader, data_to_rgb
+from .database import get_database
+
 
 mercator_tms = tms.get("WebMercatorQuad")
 
