@@ -55,7 +55,7 @@ app.include_router(
 app.include_router(
     hirise_mosaic.router, tags=["HiRISE Mosaic"], prefix="/hirise-mosaic"
 )
-app.include_router(cog.router, tags=["Global DEM"], prefix="/global-dem")
+app.include_router(cog.router, tags=["Global DEM"], prefix="/elevation-global")
 
 
 def HiRISEParams(

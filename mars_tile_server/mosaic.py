@@ -10,6 +10,9 @@ from sqlalchemy import and_, desc
 from sparrow.utils import get_logger, relative_path
 from titiler.core.utils import Timer
 from sqlalchemy import text
+from asyncio import run, get_event_loop, create_task
+from concurrent.futures import ThreadPoolExecutor
+import os
 
 import attr
 from .defs import mars_tms
@@ -29,13 +32,17 @@ def elevation_path():
 stmt = text(open(relative_path(__file__, "get-paths.sql"), "r").read())
 
 
-def get_datasets(tile: Tile, mosaic: str):
+def get_datasets(tile, mosaic):
     (x1, y1, x2, y2) = mars_tms.bounds(tile)
-
     conn = get_database()
     res = conn.execute(stmt, mosaic=mosaic, x1=x1, y1=y1, x2=x2, y2=y2, minzoom=tile.z)
+    return [d.path for d in res]
 
-    return res.all()
+
+# def get_datasets(tile: Tile, mosaic: str):
+
+#     coro = create_task(_get_datasets(tile, mosaic))
+#     return coro.result()
 
 
 @attr.s
@@ -46,7 +53,7 @@ class MarsMosaicBackend(BaseBackend):
         self.reader = MarsCOGReader
 
     def _get_assets(self, tile: Tile) -> List[str]:
-        return [d.path for d in get_datasets(tile, self.mosaicid)]
+        return get_datasets(tile, self.mosaicid)
 
     @cached(
         TTLCache(maxsize=cache_config.maxsize, ttl=cache_config.ttl),
@@ -74,7 +81,7 @@ class ElevationMosaicBackend(MarsMosaicBackend):
     def _get_assets(self, tile: Tile) -> List[str]:
         if tile.z < 10:
             return [elevation_path()]
-        return [d.path for d in get_datasets(tile, self.mosaicid)]
+        return super()._get_assets(tile)
 
     def tile(self, *args, **kwargs):
         im, assets = super().tile(*args, **kwargs)
