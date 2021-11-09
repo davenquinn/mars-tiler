@@ -10,11 +10,11 @@ from titiler.core.factory import TilerFactory
 from titiler.core.dependencies import DatasetParams, RenderParams
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 from titiler.core.resources.enums import OptionalHeader
+from .async_mosaic import AsyncMosaicFactory, get_datasets
 from .util import MarsCOGReader, ElevationReader
 from .mosaic import (
     MarsMosaicBackend,
     ElevationMosaicBackend,
-    get_datasets,
     mercator_tms,
     elevation_path,
 )
@@ -27,8 +27,10 @@ def build_path():
 headers = {OptionalHeader.server_timing, OptionalHeader.x_assets}
 
 
-hirise_mosaic = MosaicTilerFactory(
-    reader=MarsMosaicBackend, path_dependency=build_path, optional_headers=headers
+hirise_mosaic = AsyncMosaicFactory(
+    reader=MarsMosaicBackend,
+    path_dependency=lambda: "hirise_red",
+    optional_headers=headers,
 )
 
 app = FastAPI(title="Mars tile server")
@@ -43,8 +45,8 @@ cog = TilerFactory(
     path_dependency=elevation_path, reader=ElevationReader, optional_headers=headers
 )
 
-elevation_mosaic = MosaicTilerFactory(
-    path_dependency=elevation_mosaic_paths,
+elevation_mosaic = AsyncMosaicFactory(
+    path_dependency=lambda: "elevation_model",
     reader=ElevationMosaicBackend,
     optional_headers=headers,
 )
