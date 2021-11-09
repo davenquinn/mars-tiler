@@ -26,7 +26,7 @@ from morecantile import TileMatrixSet
 from rasterio.crs import CRS
 from rio_tiler.constants import WEB_MERCATOR_TMS
 from rio_tiler.errors import PointOutsideBounds
-from rio_tiler.io import BaseReader, COGReader
+from rio_tiler.io import BaseReader, AsyncBaseReader, COGReader
 from rio_tiler.models import ImageData
 from rio_tiler.mosaic import mosaic_reader
 from rio_tiler.tasks import multi_values
@@ -56,7 +56,7 @@ def get_datasets(tile, mosaic):
 
 
 @attr.s
-class AsyncBaseBackend(BaseReader):
+class AsyncBaseBackend(AsyncBaseReader):
     """Base Class for cogeo-mosaic backend storage, modified for async use
     Original file is `cogeo_mosaic.backends.base`
 
@@ -126,7 +126,7 @@ class AsyncBaseBackend(BaseReader):
         log.info(f"Got assets for tile {z}/{x}/{y}: took {t.elapsed:.2f}s")
         return assets
 
-    def tile(  # type: ignore
+    async def tile(  # type: ignore
         self,
         x: int,
         y: int,
@@ -148,7 +148,7 @@ class AsyncBaseBackend(BaseReader):
 
         return mosaic_reader(mosaic_assets, _reader, x, y, z, **kwargs)
 
-    def point(
+    async def point(
         self,
         lon: float,
         lat: float,
@@ -172,25 +172,25 @@ class AsyncBaseBackend(BaseReader):
 
         return list(multi_values(mosaic_assets, _reader, lon, lat, **kwargs).items())
 
-    def info(self):
+    async def info(self):
         raise NotImplementedError
 
-    def stats(self):
+    async def stats(self):
         raise NotImplementedError
 
-    def statistics(self):
+    async def statistics(self):
         """PlaceHolder for BaseReader.statistics."""
         raise NotImplementedError
 
-    def preview(self):
+    async def preview(self):
         """PlaceHolder for BaseReader.preview."""
         raise NotImplementedError
 
-    def part(self):
+    async def part(self):
         """PlaceHolder for BaseReader.part."""
         raise NotImplementedError
 
-    def feature(self):
+    async def feature(self):
         """PlaceHolder for BaseReader.feature."""
         raise NotImplementedError
 
@@ -214,7 +214,7 @@ class AsyncMosaicFactory(MosaicTilerFactory):
         @self.router.get(r"/tiles/{z}/{x}/{y}.{format}", **img_endpoint_params)
         @self.router.get(r"/tiles/{z}/{x}/{y}@{scale}x", **img_endpoint_params)
         @self.router.get(r"/tiles/{z}/{x}/{y}@{scale}x.{format}", **img_endpoint_params)
-        def tile(
+        async def tile(
             z: int = Path(..., ge=0, le=30, description="Mercator tiles's zoom level"),
             x: int = Path(..., description="Mercator tiles's column"),
             y: int = Path(..., description="Mercator tiles's row"),
@@ -243,7 +243,7 @@ class AsyncMosaicFactory(MosaicTilerFactory):
             threads = int(os.getenv("MOSAIC_CONCURRENCY", MAX_THREADS))
             with Timer() as t:
                 with rasterio.Env(**self.gdal_config):
-                    with self.reader(
+                    async with self.reader(
                         src_path,
                         reader=self.dataset_reader,
                         reader_options=self.reader_options,
@@ -252,7 +252,7 @@ class AsyncMosaicFactory(MosaicTilerFactory):
                         mosaic_read = t.from_start
                         timings.append(("mosaicread", round(mosaic_read * 1000, 2)))
 
-                        data, _ = src_dst.tile(
+                        data, _ = await src_dst.tile(
                             x,
                             y,
                             z,

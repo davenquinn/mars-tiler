@@ -38,7 +38,7 @@ class MarsMosaicBackend(AsyncMosaicBackend):
 
 @attr.s
 class ElevationMosaicBackend(MarsMosaicBackend):
-    def tile(self, *args, **kwargs):
-        im, assets = super().tile(*args, **kwargs)
+    async def tile(self, *args, **kwargs):
+        im, assets = await super().tile(*args, **kwargs)
         im.data = data_to_rgb(im.data[0], -10000, 0.1)
         return (im, assets)
