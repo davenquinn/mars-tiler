@@ -10,7 +10,7 @@ from titiler.core.factory import TilerFactory
 from titiler.core.dependencies import DatasetParams, RenderParams
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 from titiler.core.resources.enums import OptionalHeader
-from .util import MarsCOGReader
+from .util import MarsCOGReader, ElevationReader
 from .mosaic import (
     MarsMosaicBackend,
     ElevationMosaicBackend,
@@ -40,7 +40,7 @@ def elevation_mosaic_paths(x: int, y: int, z: int):
 
 
 cog = TilerFactory(
-    path_dependency=elevation_path, reader=MarsCOGReader, optional_headers=headers
+    path_dependency=elevation_path, reader=ElevationReader, optional_headers=headers
 )
 
 elevation_mosaic = MosaicTilerFactory(

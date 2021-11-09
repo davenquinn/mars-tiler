@@ -26,3 +26,6 @@ CREATE TABLE IF NOT EXISTS imagery.dataset (
   dtype text,
   footprint geometry(Polygon, 949900)
 );
+
+CREATE INDEX imagery_dataset_footprint_idx
+ ON imagery.dataset USING GIST (footprint);

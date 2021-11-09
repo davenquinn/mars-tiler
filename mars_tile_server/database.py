@@ -1,23 +1,17 @@
 from os import environ
 from sparrow.birdbrain import Database
+from contextvars import ContextVar
 
-db = None
-
-
-def get_database(setup=False):
-    if db is None:
-        return None
-    if setup and getattr(db, "mapper") is None:
-        db.automap()
-        # We seem to have to remap public for changes to take hold...
-        db.mapper.reflect_schema("public")
-        db.mapper.reflect_schema("imagery")
-        db.mapper.reflect_schema("public")
-    return db
-
+db_ctx = ContextVar("database", default=None)
 
 try:
-    db = Database(environ.get("FOOTPRINTS_DATABASE"))
-    get_database(setup=True)
+    db_ctx.set(Database(environ.get("FOOTPRINTS_DATABASE")).engine.connect())
 except AttributeError:
     pass
+
+
+def get_database():
+    conn = db_ctx.get()
+    if conn is None:
+        return None
+    return conn

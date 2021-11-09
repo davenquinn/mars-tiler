@@ -7,8 +7,9 @@ from cogeo_mosaic.backends import BaseBackend
 from morecantile import tms, Tile
 from geoalchemy2.functions import ST_MakeEnvelope, ST_SetSRID
 from sqlalchemy import and_, desc
-from sparrow.utils import get_logger
+from sparrow.utils import get_logger, relative_path
 from titiler.core.utils import Timer
+from sqlalchemy import text
 
 import attr
 from .defs import mars_tms
@@ -25,29 +26,16 @@ def elevation_path():
     return "/mars-data/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif"
 
 
+stmt = text(open(relative_path(__file__, "get-paths.sql"), "r").read())
+
+
 def get_datasets(tile: Tile, mosaic: str):
-    bounds = mars_tms.bounds(tile)
+    (x1, y1, x2, y2) = mars_tms.bounds(tile)
 
-    db = get_database()
+    conn = get_database()
+    res = conn.execute(stmt, mosaic=mosaic, x1=x1, y1=y1, x2=x2, y2=y2, minzoom=tile.z)
 
-    Dataset = db.model.imagery_dataset
-
-    datasets = (
-        db.session.query(Dataset)
-        .filter(Dataset.mosaic == mosaic)
-        .filter(
-            Dataset.footprint.ST_Intersects(
-                ST_SetSRID(ST_MakeEnvelope(*bounds), 949900)
-            )
-        )
-        .filter(Dataset.minzoom <= tile.z)
-        .order_by(desc(Dataset.maxzoom))
-    )
-    _datasets = datasets.all()
-    log.info(bounds)
-    log.info([d.path for d in _datasets])
-
-    return _datasets
+    return res.all()
 
 
 @attr.s
