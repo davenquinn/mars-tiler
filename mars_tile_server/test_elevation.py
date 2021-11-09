@@ -9,7 +9,7 @@ from rio_rgbify.encoders import data_to_rgb
 from shapely.geometry import Polygon
 
 from .defs.test_tms import positions
-from .mosaic import MarsMosaicBackend
+from .mosaic import MarsMosaicBackend, ElevationMosaicBackend
 from ._test_utils import dataset_footprint, fixtures, _tile_geom
 
 
@@ -21,38 +21,36 @@ class Dataset(BaseModel):
     footprint: Polygon
 
 
-@fixture
+@fixture(scope="module")
 def elevation_models():
-    return list((fixtures.resolve() / "elevation-models").glob("*.tif"))
+    paths = (fixtures.resolve() / "elevation-models").glob("*.tif")
+    return [Dataset(path=d, footprint=dataset_footprint(d)) for d in paths]
 
 
 class MarsTestMosaicBackend(MarsMosaicBackend):
     datasets: List[Dataset]
 
     def __init__(self, datasets, *args, **kwargs):
-        self.datasets = [
-            Dataset(path=d, footprint=dataset_footprint(d)) for d in datasets
+        self.datasets = datasets
+        super().__init__(self, None, *args, **kwargs)
+
+    def _get_assets(self, tile: Tile) -> List[str]:
+        tile_feature = _tile_geom(tile)
+        return [
+            str(d.path) for d in self.datasets if tile_feature.intersects(d.footprint)
         ]
-        super().__init__(None, *args, **kwargs)
-
-    def get_assets(self, x: int, y: int, z: int) -> List[str]:
-        tile = _tile_geom(Tile(x, y, z))
-        return [str(d.path) for d in self.datasets if tile.intersects(d.footprint)]
 
 
-class ElevationTestMosaicBackend(MarsTestMosaicBackend):
-    def tile(self, *args, **kwargs):
-        im, assets = super().tile(*args, **kwargs)
-        im.data = data_to_rgb(im.data[0], -10000, 0.1)
-        return (im, assets)
+class ElevationTestMosaicBackend(MarsTestMosaicBackend, ElevationMosaicBackend):
+    ...
 
 
-@fixture
+@fixture(scope="module")
 def mosaic_backend(elevation_models):
     return MarsTestMosaicBackend(elevation_models)
 
 
-@fixture
+@fixture(scope="module")
 def elevation_backend(elevation_models):
     return ElevationTestMosaicBackend(elevation_models)
 

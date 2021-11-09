@@ -52,13 +52,15 @@ class MarsMosaicBackend(BaseBackend):
     def __attrs_post_init__(self):
         self.reader = MarsCOGReader
 
+    def _get_assets(self, tile: Tile) -> List[str]:
+        return [d.path for d in get_datasets(tile, self.mosaicid)]
+
     @cached(
         TTLCache(maxsize=cache_config.maxsize, ttl=cache_config.ttl),
         key=lambda self, x, y, z: hashkey(self.mosaicid, x, y, z),
     )
     def get_assets(self, x: int, y: int, z: int) -> List[str]:
-        tile = Tile(x, y, z)
-        return [d.path for d in get_datasets(tile, self.mosaicid)]
+        return self._get_assets(Tile(x, y, z))
 
     def _read(self):
         return MosaicJSON(
