@@ -2,12 +2,12 @@ from cachetools import TTLCache, cached
 from cachetools.keys import hashkey
 from typing import List
 from cogeo_mosaic.mosaic import MosaicJSON
-from cogeo_mosaic.backends.utils import find_quadkeys
 from cogeo_mosaic.cache import cache_config
 from cogeo_mosaic.backends import BaseBackend
 from morecantile import tms, Tile
-from .util import FakeEarthCOGReader, ElevationReader, MarsCOGReader
+from .util import MarsCOGReader, ElevationMixin, data_to_rgb
 import attr
+from .defs import mars_tms
 
 from typing import List
 
@@ -22,7 +22,7 @@ log = get_logger(__name__)
 
 
 def get_datasets(tile: Tile, mosaic: str):
-    bounds = mercator_tms.bounds(tile)
+    bounds = mars_tms.bounds(tile)
 
     db = get_database()
 
@@ -69,13 +69,12 @@ class MarsMosaicBackend(BaseBackend):
     def write(self, overwrite=False):
         pass
 
-    def tile(self, *args, **kwargs):
-        return super().tile(*args, **kwargs)
-
 
 @attr.s
 class ElevationMosaicBackend(MarsMosaicBackend):
     mosaicid: str = "elevation_model"
 
-    def __attrs_post_init__(self):
-        self.reader = ElevationReader
+    def tile(self, *args, **kwargs):
+        im, assets = super().tile(*args, **kwargs)
+        im.data = data_to_rgb(im.data[0], -10000, 0.1)
+        return (im, assets)

@@ -1,19 +1,16 @@
-from sparrow.utils import relative_path
 from pathlib import Path
-from .util import ElevationReader, get_dataset_info
-from pytest import fixture, raises
-from shapely.geometry import Point, shape, Polygon
-from rio_tiler.models import ImageData
-from rio_tiler.errors import TileOutsideBounds
-from rio_rgbify.encoders import data_to_rgb
-from morecantile import Tile
 from typing import List
-from .defs import mars_tms
-from .util import MarsCOGReader
-from ._test_utils import dataset_footprint, fixtures, _tile_geom
-from .defs.test_tms import positions
-from .mosaic import ElevationMosaicBackend, MarsMosaicBackend, ElevationReader
+
+from morecantile import Tile
 from pydantic import BaseModel
+from pytest import fixture
+from rio_tiler.models import ImageData
+from rio_rgbify.encoders import data_to_rgb
+from shapely.geometry import Polygon
+
+from .defs.test_tms import positions
+from .mosaic import MarsMosaicBackend
+from ._test_utils import dataset_footprint, fixtures, _tile_geom
 
 
 class Dataset(BaseModel):
@@ -54,10 +51,12 @@ def test_basic_tiler(elevation_models):
     test_tile = positions[0].tile
     backend = MarsTestMosaicBackend(elevation_models)
     tile_data = backend.tile(test_tile.x, test_tile.y, test_tile.z)
-    assert True
 
 
 def test_elevation_tiler(elevation_models):
     test_tile = positions[0].tile
     backend = ElevationTestMosaicBackend(elevation_models)
-    tile_data = backend.tile(test_tile.x, test_tile.y, test_tile.z)
+    tile_data, assets = backend.tile(test_tile.x, test_tile.y, test_tile.z)
+    assert len(assets) == 2
+    assert isinstance(tile_data, ImageData)
+    assert tile_data.data.shape == (3, 256, 256)

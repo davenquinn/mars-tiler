@@ -122,10 +122,15 @@ class MarsCOGReader(COGReader):
 
 
 def post_process(elevation, mask):
-    heights = elevation[0]
-    heights[mask] = 0
-    rgb = data_to_rgb(heights, -10000, 0.1)
+    rgb = data_to_rgb(elevation, -10000, 0.1)
     return rgb, mask
+
+
+class ElevationMixin:
+    def tile(self, *args, **kwargs):
+        im, assets = super().tile(*args, **kwargs)
+        im.data = data_to_rgb(im.data[0], -10000, 0.1)
+        return (im, assets)
 
 
 class ElevationReader(MarsCOGReader):
