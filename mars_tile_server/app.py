@@ -32,7 +32,7 @@ hirise_mosaic = AsyncMosaicFactory(
     optional_headers=headers,
 )
 
-app = FastAPI(title="Mars tile server")
+app = FastAPI(title="Mars tile server", root_path="/tiles")
 
 
 def elevation_mosaic_paths(x: int, y: int, z: int):
