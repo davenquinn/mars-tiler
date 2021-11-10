@@ -6,23 +6,16 @@ from typing import Dict, Type
 
 import rasterio
 from rio_tiler.constants import MAX_THREADS
-from titiler.core.utils import Timer
 from titiler.mosaic.factory import MosaicTilerFactory
 from titiler.core.factory import img_endpoint_params
 from titiler.core.resources.enums import ImageType, OptionalHeader
 from titiler.mosaic.resources.enums import PixelSelectionMethod
 from fastapi import Depends, Path, Query
-from starlette.responses import Response
-
-
-import itertools
-from typing import Any, Dict, List, Optional, Tuple, Type
+from starlette.responses import Response, JSONResponse
+from typing import Any, Dict, List, Tuple, Type
 
 import attr
-import mercantile
-from cachetools import TTLCache, cached
-from cachetools.keys import hashkey
-from morecantile import TileMatrixSet
+from morecantile import TileMatrixSet, Tile
 from rasterio.crs import CRS
 from rio_tiler.constants import WEB_MERCATOR_TMS
 from rio_tiler.errors import PointOutsideBounds
@@ -30,17 +23,12 @@ from rio_tiler.io import BaseReader, AsyncBaseReader, COGReader
 from rio_tiler.models import ImageData
 from rio_tiler.mosaic import mosaic_reader
 from rio_tiler.tasks import multi_values
-
-from cogeo_mosaic.backends.utils import find_quadkeys
-from cogeo_mosaic.cache import cache_config
 from cogeo_mosaic.errors import NoAssetFoundError
-from cogeo_mosaic.mosaic import MosaicJSON
-from morecantile import Tile
-
 from sparrow.utils import relative_path, get_logger
-
-from .defs import mars_tms
 from sqlalchemy import text
+
+from .timer import Timer
+from .defs import mars_tms
 from .database import get_database
 
 log = get_logger(__name__)
@@ -48,11 +36,14 @@ log = get_logger(__name__)
 stmt = text(open(relative_path(__file__, "get-paths.sql"), "r").read())
 
 
-def get_datasets(tile, mosaic):
+async def get_datasets(tile, mosaic):
     (x1, y1, x2, y2) = mars_tms.bounds(tile)
-    conn = get_database()
-    res = conn.execute(stmt, mosaic=mosaic, x1=x1, y1=y1, x2=x2, y2=y2, minzoom=tile.z)
-    return [d.path for d in res]
+    async with get_database() as conn:
+        Timer.add_step("dbconnect")
+        res = await conn.execute(
+            stmt, dict(mosaic=mosaic, x1=x1, y1=y1, x2=x2, y2=y2, minzoom=tile.z)
+        )
+        return [d.path for d in res.all()]
 
 
 @attr.s
@@ -89,42 +80,17 @@ class AsyncBaseBackend(AsyncBaseReader):
     )
     crs: CRS = attr.ib(init=False, default=CRS.from_epsg(4326))
 
-    def assets_for_tile(self, x: int, y: int, z: int) -> List[str]:
+    async def assets_for_tile(self, x: int, y: int, z: int) -> List[str]:
         """Retrieve assets for tile."""
-        return self.get_assets(x, y, z)
+        return await self.get_assets(x, y, z)
 
-    def assets_for_point(self, lng: float, lat: float) -> List[str]:
+    async def assets_for_point(self, lng: float, lat: float) -> List[str]:
         """Retrieve assets for point."""
-        tile = mercantile.tile(lng, lat, self.quadkey_zoom)
-        return self.get_assets(tile.x, tile.y, tile.z)
+        tile = self.tms.tile(lng, lat, self.quadkey_zoom)
+        return await self.get_assets(tile.x, tile.y, tile.z)
 
-    def assets_for_bbox(
-        self, xmin: float, ymin: float, xmax: float, ymax: float
-    ) -> List[str]:
-        """Retrieve assets for bbox."""
-        tl_tile = mercantile.tile(xmin, ymax, self.quadkey_zoom)
-        br_tile = mercantile.tile(xmax, ymin, self.quadkey_zoom)
-
-        tiles = [
-            (x, y, self.quadkey_zoom)
-            for x in range(tl_tile.x, br_tile.x + 1)
-            for y in range(tl_tile.y, br_tile.y + 1)
-        ]
-
-        return list(
-            dict.fromkeys(
-                itertools.chain.from_iterable([self.assets_for_tile(*t) for t in tiles])
-            )
-        )
-
-    def _get_assets(self, tile: Tile) -> List[str]:
-        return get_datasets(tile, self.mosaicid)
-
-    def get_assets(self, x: int, y: int, z: int) -> List[str]:
-        with Timer() as t:
-            assets = self._get_assets(Tile(x, y, z))
-        log.info(f"Got assets for tile {z}/{x}/{y}: took {t.elapsed:.2f}s")
-        return assets
+    async def get_assets(self, x: int, y: int, z: int) -> List[str]:
+        return await get_datasets(Tile(x, y, z), self.mosaicid)
 
     async def tile(  # type: ignore
         self,
@@ -135,18 +101,21 @@ class AsyncBaseBackend(AsyncBaseReader):
         **kwargs: Any,
     ) -> Tuple[ImageData, List[str]]:
         """Get Tile from multiple observation."""
-        mosaic_assets = self.assets_for_tile(x, y, z)
+        mosaic_assets = await self.assets_for_tile(x, y, z)
         if not mosaic_assets:
             raise NoAssetFoundError(f"No assets found for tile {z}-{x}-{y}")
 
         if reverse:
             mosaic_assets = list(reversed(mosaic_assets))
+        Timer.add_step("findassets")
 
         def _reader(asset: str, x: int, y: int, z: int, **kwargs: Any) -> ImageData:
             with self.reader(asset, **self.reader_options) as src_dst:
                 return src_dst.tile(x, y, z, **kwargs)
 
-        return mosaic_reader(mosaic_assets, _reader, x, y, z, **kwargs)
+        data = mosaic_reader(mosaic_assets, _reader, x, y, z, **kwargs)
+        Timer.add_step("readdata")
+        return data
 
     async def point(
         self,
@@ -235,47 +204,44 @@ class AsyncMosaicFactory(MosaicTilerFactory):
             kwargs: Dict = Depends(self.additional_dependency),
         ):
             """Create map tile from a COG."""
-            timings = []
             headers: Dict[str, str] = {}
 
             tilesize = scale * 256
 
             threads = int(os.getenv("MOSAIC_CONCURRENCY", MAX_THREADS))
-            with Timer() as t:
-                with rasterio.Env(**self.gdal_config):
-                    async with self.reader(
-                        src_path,
-                        reader=self.dataset_reader,
-                        reader_options=self.reader_options,
-                        **self.backend_options,
-                    ) as src_dst:
-                        mosaic_read = t.from_start
-                        timings.append(("mosaicread", round(mosaic_read * 1000, 2)))
+            timer = Timer()
+            with timer.context() as t:
+                # with rasterio.Env(**self.gdal_config):
+                async with self.reader(
+                    src_path,
+                    reader=self.dataset_reader,
+                    reader_options=self.reader_options,
+                    **self.backend_options,
+                ) as src_dst:
+                    t.add_step("mosaicread")
 
-                        data, _ = await src_dst.tile(
-                            x,
-                            y,
-                            z,
-                            pixel_selection=pixel_selection.method(),
-                            tilesize=tilesize,
-                            threads=threads,
-                            **layer_params.kwargs,
-                            **dataset_params.kwargs,
-                            **kwargs,
-                        )
-            timings.append(("dataread", round((t.elapsed - mosaic_read) * 1000, 2)))
+                    data, _ = await src_dst.tile(
+                        x,
+                        y,
+                        z,
+                        pixel_selection=pixel_selection.method(),
+                        tilesize=tilesize,
+                        threads=threads,
+                        **layer_params.kwargs,
+                        **dataset_params.kwargs,
+                        **kwargs,
+                    )
+                # timings.append(("dataread", round((t.elapsed - mosaic_read) * 1000, 2)))
 
-            if not format:
-                format = ImageType.jpeg if data.mask.all() else ImageType.png
+                if not format:
+                    format = ImageType.jpeg if data.mask.all() else ImageType.png
 
-            with Timer() as t:
                 image = data.post_process(
                     in_range=render_params.rescale_range,
                     color_formula=render_params.color_formula,
                 )
-            timings.append(("postprocess", round(t.elapsed * 1000, 2)))
+                t.add_step("postprocess")
 
-            with Timer() as t:
                 content = image.render(
                     add_mask=render_params.return_mask,
                     img_format=format.driver,
@@ -283,14 +249,43 @@ class AsyncMosaicFactory(MosaicTilerFactory):
                     **format.profile,
                     **render_params.kwargs,
                 )
-            timings.append(("format", round(t.elapsed * 1000, 2)))
+                t.add_step("format")
 
             if OptionalHeader.server_timing in self.optional_headers:
-                headers["Server-Timing"] = ", ".join(
-                    [f"{name};dur={time}" for (name, time) in timings]
-                )
+                headers["Server-Timing"] = timer.server_timings()
 
             if OptionalHeader.x_assets in self.optional_headers:
                 headers["X-Assets"] = ",".join(data.assets)
 
             return Response(content, media_type=format.mediatype, headers=headers)
+
+    def assets(self):
+        """Register /assets endpoint."""
+
+        @self.router.get(
+            r"/tiles/{z}/{x}/{y}/info",
+            responses={200: {"description": "Return list of COGs"}},
+        )
+        async def assets_for_tile(
+            z: int = Path(..., ge=0, le=30, description="Mercator tiles's zoom level"),
+            x: int = Path(..., description="Mercator tiles's column"),
+            y: int = Path(..., description="Mercator tiles's row"),
+            src_path=Depends(self.path_dependency),
+        ):
+            """Return a list of assets which overlap a given tile"""
+            timer = Timer()
+            with timer.context() as t:
+                bbox = mars_tms.bounds(Tile(x, y, z))
+                t.add_step("tilebbox")
+                async with self.reader(src_path, **self.backend_options) as mosaic:
+                    t.add_step("setupreader")
+                    assets = await mosaic.assets_for_tile(x, y, z)
+                    t.add_step("findassets")
+                coords = ", ".join([f"{pos:.5f}" for pos in bbox])
+                env = f"ST_MakeEnvelope({coords})"
+
+            headers = {}
+            headers["Server-Timing"] = timer.server_timings()
+            return JSONResponse(
+                {"assets": assets, "xy_bounds": bbox, "envelope": env}, headers=headers
+            )

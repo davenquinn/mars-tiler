@@ -1,23 +1,30 @@
 from os import environ
 from contextvars import ContextVar
-from sqlalchemy import create_engine
-from asyncio import run
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
+from contextlib import asynccontextmanager
 
 db_ctx = ContextVar("database", default=None)
 
 
 def setup_database():
     try:
-        engine = create_engine(environ.get("FOOTPRINTS_DATABASE"))
-        conn = engine.connect()
-        db_ctx.set(conn)
-        return conn
+        engine = create_async_engine(
+            environ.get("FOOTPRINTS_DATABASE").replace(
+                "postgresql://", "postgresql+asyncpg://"
+            )
+        )
+        db_ctx.set(engine)
+        return engine
     except AttributeError:
         return None
 
 
-def get_database():
-    conn = db_ctx.get()
-    if conn is None:
-        return setup_database()
-    return conn
+@asynccontextmanager
+async def get_database() -> AsyncSession:
+    engine = db_ctx.get()
+    if engine is None:
+        engine = setup_database()
+    async with engine.connect() as conn:
+        yield conn
+    await engine.dispose()

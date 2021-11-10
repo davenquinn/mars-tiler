@@ -3,13 +3,12 @@ from typing import Optional, Union, List
 import logging
 
 from fastapi import FastAPI, Query
-from cogeo_mosaic.backends import MosaicBackend
-from titiler.mosaic.factory import MosaicTilerFactory
-from titiler.mosaic.errors import MOSAIC_STATUS_CODES
 from titiler.core.factory import TilerFactory
 from titiler.core.dependencies import DatasetParams, RenderParams
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
+from titiler.mosaic.errors import MOSAIC_STATUS_CODES
 from titiler.core.resources.enums import OptionalHeader
+from .database import setup_database, db_ctx
 from .async_mosaic import AsyncMosaicFactory, get_datasets
 from .util import MarsCOGReader, ElevationReader
 from .mosaic import (
@@ -100,13 +99,13 @@ async def dataset(mosaic: str, lon: float = None, lat: float = None, zoom: int =
     xy_bounds = mercator_tms.xy_bounds(tile)
     bounds = mercator_tms.bounds(tile)
 
-    datasets = get_datasets(tile, mosaic)
+    datasets = await get_datasets(tile, mosaic)
 
     return {
         "mercator_bounds": xy_bounds,
         "latlng_bounds": bounds,
         "tile": tile,
-        "datasets": [d.path for d in datasets],
+        "datasets": [d for d in datasets],
     }
 
 
@@ -116,7 +115,14 @@ add_exception_handlers(app, MOSAIC_STATUS_CODES)
 
 @app.on_event("startup")
 async def startup_event():
+    setup_database()
     logger = logging.getLogger("mars_tile_server")
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
     logger.addHandler(handler)
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    engine = db_ctx.get()
+    await engine.dispose()

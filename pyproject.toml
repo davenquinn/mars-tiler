@@ -20,6 +20,7 @@ typer = "^0.4.0"
 uvicorn = "^0.15.0"
 pytest = "^6.2.5"
 pyproj = "^3.2.1"
+asyncpg = "^0.24.0"
 
 [tool.poetry.dev-dependencies]
 debugpy = "^1.5.1"
