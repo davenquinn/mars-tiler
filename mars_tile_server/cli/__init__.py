@@ -9,7 +9,7 @@ from shapely.geometry import shape
 from sparrow.utils import relative_path
 from sparrow.dinosaur import Dinosaur
 
-from ..database import get_database
+from ..database import get_sync_database
 from .mosaic import mosaic_cli, get_footprints
 
 import logging
@@ -38,7 +38,7 @@ cli.add_typer(footprints, name="footprints")
 
 
 def _update_footprints(datasets, mosaic=None):
-    db = get_database()
+    db = get_sync_database()
     Dataset = db.model.imagery_dataset
     footprints = get_footprints(datasets)
     for f in footprints:
@@ -69,7 +69,7 @@ def add_footprints(datasets: List[Path], mosaic: Optional[str] = None):
 
 @cli.command(name="update")
 def update_footprints(mosaic: Optional[str] = None):
-    db = get_database()
+    db = get_sync_database()
 
     Dataset = db.model.imagery_dataset
     datasets = db.session.query(Dataset)
@@ -89,7 +89,7 @@ class Migrator(Dinosaur):
 
 @cli.command(name="migrate")
 def migrate(force: bool = False):
-    db = get_database()
+    db = get_sync_database()
     kwargs = dict(dry_run=False, apply=False)
     if force:
         kwargs["apply"] = True
