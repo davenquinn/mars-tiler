@@ -25,7 +25,7 @@ from rio_tiler.mosaic import mosaic_reader
 from rio_tiler.tasks import multi_values
 from cogeo_mosaic.errors import NoAssetFoundError
 from sparrow.utils import relative_path, get_logger
-from sqlalchemy import text
+from mercantile import bounds
 
 from .timer import Timer
 from .defs import mars_tms
@@ -33,17 +33,33 @@ from .database import get_database
 
 log = get_logger(__name__)
 
-stmt = text(open(relative_path(__file__, "get-paths.sql"), "r").read())
+stmt = open(relative_path(__file__, "get-paths.sql"), "r").read()
 
 
 async def get_datasets(tile, mosaic):
-    (x1, y1, x2, y2) = mars_tms.bounds(tile)
-    async with get_database() as conn:
-        Timer.add_step("dbconnect")
-        res = await conn.execute(
-            stmt, dict(mosaic=mosaic, x1=x1, y1=y1, x2=x2, y2=y2, minzoom=tile.z)
-        )
-        return [d.path for d in res.all()]
+    if tile.z <= 8:
+        return ["/mars-data/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif"]
+
+    bbox = bounds(tile.x, tile.y, tile.z)
+
+    # Morecantile is really slow!
+    # (x1, y1, x2, y2) = mars_tms.bounds(tile)
+    Timer.add_step("tilebounds")
+    db = await get_database()
+    Timer.add_step("dbconnect")
+    res = await db.fetch_all(
+        query=stmt,
+        values=dict(
+            mosaic=mosaic,
+            x1=bbox.west,
+            y1=bbox.south,
+            x2=bbox.east,
+            y2=bbox.north,
+            minzoom=tile.z,
+        ),
+    )
+    Timer.add_step("findassets")
+    return [str(d._mapping["path"]) for d in res]
 
 
 @attr.s
@@ -107,7 +123,6 @@ class AsyncBaseBackend(AsyncBaseReader):
 
         if reverse:
             mosaic_assets = list(reversed(mosaic_assets))
-        Timer.add_step("findassets")
 
         def _reader(asset: str, x: int, y: int, z: int, **kwargs: Any) -> ImageData:
             with self.reader(asset, **self.reader_options) as src_dst:
@@ -125,7 +140,7 @@ class AsyncBaseBackend(AsyncBaseReader):
         **kwargs: Any,
     ) -> List:
         """Get Point value from multiple observation."""
-        mosaic_assets = self.assets_for_point(lon, lat)
+        mosaic_assets = await self.assets_for_point(lon, lat)
         if not mosaic_assets:
             raise NoAssetFoundError(f"No assets found for point ({lon},{lat})")
 

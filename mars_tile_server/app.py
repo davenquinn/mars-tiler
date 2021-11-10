@@ -8,7 +8,7 @@ from titiler.core.dependencies import DatasetParams, RenderParams
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 from titiler.mosaic.errors import MOSAIC_STATUS_CODES
 from titiler.core.resources.enums import OptionalHeader
-from .database import setup_database, db_ctx
+from .database import setup_database, get_database
 from .async_mosaic import AsyncMosaicFactory, get_datasets
 from .util import MarsCOGReader, ElevationReader
 from .mosaic import (
@@ -115,7 +115,7 @@ add_exception_handlers(app, MOSAIC_STATUS_CODES)
 
 @app.on_event("startup")
 async def startup_event():
-    setup_database()
+    await setup_database()
     logger = logging.getLogger("mars_tile_server")
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
@@ -124,5 +124,5 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    engine = db_ctx.get()
-    await engine.dispose()
+    db = await get_database()
+    await db.disconnect()

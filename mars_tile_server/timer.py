@@ -39,7 +39,7 @@ class Timer:
 
     def server_timings(self):
         return ", ".join(
-            [f"{t.name};dur={round(t.delta*1000, 2)}" for t in self.timings[1:]]
+            [f"{t.name};dur={round(t.delta*1000, 1)}" for t in self.timings[1:]]
         )
 
     @contextmanager
