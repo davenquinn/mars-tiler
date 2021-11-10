@@ -33,22 +33,14 @@ def create_tables():
     initialize_database()
 
 
-@cli.command(name="build-footprints")
-def build_footprints(
-    datasets: List[Path], mosaic: Optional[str] = None, update: bool = False
-):
+footprints = Typer()
+cli.add_typer(footprints, name="footprints")
+
+
+def _update_footprints(datasets, mosaic=None):
     db = get_database()
-
     Dataset = db.model.imagery_dataset
-
-    _datasets = datasets
-    if update:
-        datasets = db.session.query(Dataset)
-        if mosaic is not None:
-            datasets = datasets.filter(Dataset.mosaic == mosaic)
-        _datasets = (Path(d.path) for d in datasets.all())
-
-    footprints = get_footprints(_datasets)
+    footprints = get_footprints(datasets)
     for f in footprints:
         path = Path(f["properties"]["path"]).absolute()
 
@@ -67,8 +59,24 @@ def build_footprints(
         for k, v in kw.items():
             setattr(dataset, k, v)
         db.session.add(dataset)
-
         db.session.commit()
+
+
+@footprints.command(name="add")
+def add_footprints(datasets: List[Path], mosaic: Optional[str] = None):
+    _update_footprints(datasets, mosaic)
+
+
+@cli.command(name="update")
+def update_footprints(mosaic: Optional[str] = None):
+    db = get_database()
+
+    Dataset = db.model.imagery_dataset
+    datasets = db.session.query(Dataset)
+    if mosaic is not None:
+        datasets = datasets.filter(Dataset.mosaic == mosaic)
+    _datasets = (Path(d.path) for d in datasets.all())
+    _update_footprints(_datasets, mosaic)
 
 
 _base = "postgresql://postgres:angry0405wombat@database:5432/"

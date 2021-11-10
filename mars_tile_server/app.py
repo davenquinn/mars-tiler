@@ -26,12 +26,6 @@ def build_path():
 headers = {OptionalHeader.server_timing, OptionalHeader.x_assets}
 
 
-hirise_mosaic = AsyncMosaicFactory(
-    reader=MarsMosaicBackend,
-    path_dependency=lambda: "hirise_red",
-    optional_headers=headers,
-)
-
 app = FastAPI(title="Mars tile server", root_path="/tiles")
 
 
@@ -49,14 +43,6 @@ elevation_mosaic = AsyncMosaicFactory(
     reader=ElevationMosaicBackend,
     optional_headers=headers,
 )
-
-app.include_router(
-    elevation_mosaic.router, tags=["Elevation Mosaic"], prefix="/elevation-mosaic"
-)
-app.include_router(
-    hirise_mosaic.router, tags=["HiRISE Mosaic"], prefix="/hirise-mosaic"
-)
-app.include_router(cog.router, tags=["Global DEM"], prefix="/elevation-global")
 
 
 def HiRISEParams(
@@ -84,6 +70,14 @@ class HiRISERenderParams(RenderParams):
     )
 
 
+hirise_mosaic = AsyncMosaicFactory(
+    reader=MarsMosaicBackend,
+    path_dependency=lambda: "hirise_red",
+    optional_headers=headers,
+    dataset_dependency=HiRISEImageParams,
+    render_dependency=HiRISERenderParams,
+)
+
 hirise_cog = TilerFactory(
     reader=MarsCOGReader,
     path_dependency=HiRISEParams,
@@ -91,6 +85,14 @@ hirise_cog = TilerFactory(
     render_dependency=HiRISERenderParams,
 )
 app.include_router(hirise_cog.router, tags=["HiRISE images"], prefix="/hirise")
+
+app.include_router(
+    elevation_mosaic.router, tags=["Elevation Mosaic"], prefix="/elevation-mosaic"
+)
+app.include_router(
+    hirise_mosaic.router, tags=["HiRISE Mosaic"], prefix="/hirise-mosaic"
+)
+app.include_router(cog.router, tags=["Global DEM"], prefix="/elevation-global")
 
 
 @app.get("/datasets/{mosaic}")

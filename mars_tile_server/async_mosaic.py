@@ -37,8 +37,10 @@ stmt = open(relative_path(__file__, "get-paths.sql"), "r").read()
 
 
 async def get_datasets(tile, mosaic):
-    if tile.z <= 8:
-        return ["/mars-data/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif"]
+    if tile.z <= 8 and mosaic == "elevation_model":
+        return [
+            "/mars-data/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif"
+        ]
 
     bbox = bounds(tile.x, tile.y, tile.z)
 
@@ -55,7 +57,7 @@ async def get_datasets(tile, mosaic):
             y1=bbox.south,
             x2=bbox.east,
             y2=bbox.north,
-            minzoom=tile.z,
+            minzoom=tile.z + 2,
         ),
     )
     Timer.add_step("findassets")
@@ -105,8 +107,11 @@ class AsyncBaseBackend(AsyncBaseReader):
         tile = self.tms.tile(lng, lat, self.quadkey_zoom)
         return await self.get_assets(tile.x, tile.y, tile.z)
 
+    async def _get_assets(self, tile: Tile) -> List[str]:
+        return await get_datasets(tile, self.mosaicid)
+
     async def get_assets(self, x: int, y: int, z: int) -> List[str]:
-        return await get_datasets(Tile(x, y, z), self.mosaicid)
+        return await self._get_assets(Tile(x, y, z))
 
     async def tile(  # type: ignore
         self,
