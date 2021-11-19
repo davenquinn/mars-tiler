@@ -50,3 +50,5 @@ COPY ./tools/tile-server /tools/tile-server/
 
 # Install the root package
 RUN poetry install --no-interaction --no-ansi
+# Override some poetry packages with local versions
+RUN pip install -r poetry-overrides.txt

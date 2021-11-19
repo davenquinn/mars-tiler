@@ -70,9 +70,14 @@ class HiRISERenderParams(RenderParams):
     )
 
 
+def MosaicParams(mosaic: str = Query(..., description="Mosaic ID")) -> str:
+    """Mosaic ID"""
+    return mosaic
+
+
 hirise_mosaic = AsyncMosaicFactory(
     reader=MarsMosaicBackend,
-    path_dependency=lambda: "hirise_red",
+    path_dependency=MosaicParams,
     optional_headers=headers,
     dataset_dependency=HiRISEImageParams,
     render_dependency=HiRISERenderParams,
@@ -90,7 +95,7 @@ app.include_router(
     elevation_mosaic.router, tags=["Elevation Mosaic"], prefix="/elevation-mosaic"
 )
 app.include_router(
-    hirise_mosaic.router, tags=["HiRISE Mosaic"], prefix="/hirise-mosaic"
+    hirise_mosaic.router, tags=["Imagery Mosaic"], prefix="/mosaic/{mosaic}"
 )
 app.include_router(cog.router, tags=["Global DEM"], prefix="/elevation-global")
 
