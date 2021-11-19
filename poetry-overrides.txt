@@ -1,1 +1,2 @@
--e ./deps/morecantile
+morecantile==3.0.2
+-e ./deps/timvt

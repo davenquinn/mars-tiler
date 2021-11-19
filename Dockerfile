@@ -31,6 +31,7 @@ ENV PIP_DEFAULT_TIMEOUT=100 \
 
 # Copy only requirements to cache them in docker layer
 COPY ./tools/tile-server/poetry.lock ./tools/tile-server/pyproject.toml /tools/tile-server/
+COPY ./tools/tile-server/deps /tools/tile-server/deps
 
 # Project initialization:
 WORKDIR /tools/tile-server
