@@ -4,7 +4,7 @@ import logging
 
 from fastapi import FastAPI, Query
 from titiler.core.factory import TilerFactory
-from titiler.core.dependencies import DatasetParams, RenderParams
+from titiler.core.dependencies import DatasetParams, RenderParams, ResamplingName
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 from titiler.mosaic.errors import MOSAIC_STATUS_CODES
 from titiler.core.resources.enums import OptionalHeader
@@ -36,12 +36,6 @@ def elevation_mosaic_paths(x: int, y: int, z: int):
 
 cog = TilerFactory(
     path_dependency=elevation_path, reader=ElevationReader, optional_headers=headers
-)
-
-elevation_mosaic = AsyncMosaicFactory(
-    path_dependency=lambda: "elevation_model",
-    reader=ElevationMosaicBackend,
-    optional_headers=headers,
 )
 
 
@@ -91,9 +85,27 @@ hirise_cog = TilerFactory(
 )
 app.include_router(hirise_cog.router, tags=["HiRISE images"], prefix="/hirise")
 
+
+@dataclass
+class ElevationMosaicParams(DatasetParams):
+    resampling_method: ResamplingName = Query(
+        ResamplingName.bilinear,  # type: ignore
+        alias="resampling",
+        description="Resampling method.",
+    )
+
+
+# This is the main dataset
+elevation_mosaic = AsyncMosaicFactory(
+    path_dependency=lambda: "elevation_model",
+    dataset_dependency=ElevationMosaicParams,
+    reader=ElevationMosaicBackend,
+    optional_headers=headers,
+)
 app.include_router(
     elevation_mosaic.router, tags=["Elevation Mosaic"], prefix="/elevation-mosaic"
 )
+
 app.include_router(
     hirise_mosaic.router, tags=["Imagery Mosaic"], prefix="/mosaic/{mosaic}"
 )
