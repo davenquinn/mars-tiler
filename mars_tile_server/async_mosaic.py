@@ -57,7 +57,7 @@ async def get_datasets(tile, mosaic):
             y1=bbox.south,
             x2=bbox.east,
             y2=bbox.north,
-            minzoom=tile.z + 2,
+            minzoom=tile.z + 4,
         ),
     )
     Timer.add_step("findassets")

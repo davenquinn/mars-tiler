@@ -12,7 +12,7 @@ from .database import setup_database, get_database
 from .async_mosaic import AsyncMosaicFactory, get_datasets
 from .util import MarsCOGReader, ElevationReader
 from .mosaic import (
-    MarsMosaicBackend,
+    HiRISEMosaicBackend,
     ElevationMosaicBackend,
     mercator_tms,
     elevation_path,
@@ -50,9 +50,9 @@ def HiRISEParams(
 class HiRISEImageParams(DatasetParams):
     """Low level WarpedVRT Optional parameters."""
 
-    nodata: Optional[Union[str, int, float]] = Query(
-        0, title="Nodata value", description="Overwrite internal Nodata value"
-    )
+    # nodata: Optional[Union[str, int, float]] = Query(
+    #     0, title="Nodata value", description="Overwrite internal Nodata value"
+    # )
 
 
 @dataclass
@@ -70,7 +70,7 @@ def MosaicParams(mosaic: str = Query(..., description="Mosaic ID")) -> str:
 
 
 hirise_mosaic = AsyncMosaicFactory(
-    reader=MarsMosaicBackend,
+    reader=HiRISEMosaicBackend,
     path_dependency=MosaicParams,
     optional_headers=headers,
     dataset_dependency=HiRISEImageParams,

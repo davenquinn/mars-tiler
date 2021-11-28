@@ -136,6 +136,21 @@ class ElevationReader(MarsCOGReader):
         return super().part(*args, **kwargs)
 
 
+def post_process_hirise(data, mask):
+    mask[data[0] == 0] = True
+    return data, mask
+
+
+class HiRISEReader(MarsCOGReader):
+    def preview(self, *args, **kwargs):
+        kwargs["post_process"] = post_process_hirise
+        return super().preview(*args, **kwargs)
+
+    def part(self, *args, **kwargs):
+        kwargs["post_process"] = post_process_hirise
+        return super().part(*args, **kwargs)
+
+
 def get_dataset_info(src_path: str, **kwargs) -> Dict:
     """Get rasterio dataset meta, faking an Earth CRS internally as needed."""
     with MarsCOGReader(src_path, **kwargs) as cog:

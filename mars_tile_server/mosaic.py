@@ -17,7 +17,7 @@ import os
 import attr
 from .async_mosaic import AsyncMosaicBackend
 from .defs import mars_tms
-from .util import MarsCOGReader, data_to_rgb
+from .util import MarsCOGReader, HiRISEReader, data_to_rgb
 from .database import get_database
 from .timer import Timer
 
@@ -43,3 +43,9 @@ class ElevationMosaicBackend(MarsMosaicBackend):
         im.data = data_to_rgb(im.data[0], -10000, 0.1)
         Timer.add_step("rgbencode")
         return (im, assets)
+
+
+@attr.s
+class HiRISEMosaicBackend(MarsMosaicBackend):
+    def __attrs_post_init__(self):
+        self.reader = HiRISEReader
