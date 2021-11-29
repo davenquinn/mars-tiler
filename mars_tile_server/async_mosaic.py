@@ -3,6 +3,7 @@
 import os
 from dataclasses import dataclass
 from typing import Dict, Type
+from json import loads
 
 import rasterio
 from rio_tiler.constants import MAX_THREADS
@@ -33,7 +34,9 @@ from .database import get_database
 
 log = get_logger(__name__)
 
-stmt = open(relative_path(__file__, "get-paths.sql"), "r").read()
+
+def prepared_statement(id):
+    return open(relative_path(__file__, "sql", f"{id}.sql"), "r").read()
 
 
 async def get_datasets(tile, mosaic):
@@ -50,18 +53,19 @@ async def get_datasets(tile, mosaic):
     db = await get_database()
     Timer.add_step("dbconnect")
     res = await db.fetch_all(
-        query=stmt,
+        query=prepared_statement("get-paths"),
         values=dict(
             mosaic=mosaic,
             x1=bbox.west,
             y1=bbox.south,
             x2=bbox.east,
             y2=bbox.north,
-            minzoom=tile.z + 4,
         ),
     )
     Timer.add_step("findassets")
-    return [str(d._mapping["path"]) for d in res]
+    return [
+        str(d._mapping["path"]) for d in res if int(d._mapping["minzoom"]) - 4 < tile.z
+    ]
 
 
 @attr.s
@@ -188,6 +192,12 @@ class AsyncMosaicBackend(AsyncBaseBackend):
     ...
 
 
+def prepare_record(d):
+    data = dict(**d)
+    data["geometry"] = loads(d["geometry"])
+    return data
+
+
 @dataclass
 class AsyncMosaicFactory(MosaicTilerFactory):
     reader: Type[AsyncMosaicBackend] = AsyncMosaicBackend
@@ -309,3 +319,19 @@ class AsyncMosaicFactory(MosaicTilerFactory):
             return JSONResponse(
                 {"assets": assets, "xy_bounds": bbox, "envelope": env}, headers=headers
             )
+
+        @self.router.get(
+            "/assets", responses={200: {"description": "Return all footprints."}}
+        )
+        async def assets(mosaic=Depends(self.path_dependency)):
+            db = await get_database()
+            data = await db.fetch_all(
+                query=prepared_statement("get-datasets"),
+                values=dict(
+                    mosaic=mosaic,
+                ),
+            )
+            return {
+                "type": "FeatureCollection",
+                "features": [prepare_record(d) for d in data],
+            }

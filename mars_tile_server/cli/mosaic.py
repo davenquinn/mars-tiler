@@ -58,8 +58,6 @@ def create_mosaic(
 
     features = get_footprints(files, quiet=quiet, dtype=dtype)
 
-    features
-
     if dry_run:
         for f in features:
             print(f)

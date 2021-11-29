@@ -1,0 +1,3 @@
+https://argyre.geoscience.wisc.edu/tiles/mosaic/hirise_red/tiles/13/7497/4157.png
+https://argyre.geoscience.wisc.edu/tiles/mosaic/hirise_red/tiles/13/7498/4158.png
+https://argyre.geoscience.wisc.edu/tiles/elevation-mosaic/tiles/13/7498/4158.png

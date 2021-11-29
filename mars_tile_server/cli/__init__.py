@@ -12,6 +12,7 @@ from sparrow.dinosaur import Dinosaur
 from ..database import get_sync_database
 from .mosaic import mosaic_cli, get_footprints
 
+import rasterio
 import logging
 import sys
 
@@ -34,7 +35,7 @@ def create_tables():
 
 
 footprints = Typer()
-cli.add_typer(footprints, name="footprints")
+cli.add_typer(footprints, name="images")
 
 
 def _update_footprints(datasets, mosaic=None):
@@ -62,21 +63,42 @@ def _update_footprints(datasets, mosaic=None):
         db.session.commit()
 
 
-@footprints.command(name="add")
+@footprints.command(name="calculate-footprints")
 def add_footprints(datasets: List[Path], mosaic: Optional[str] = None):
     _update_footprints(datasets, mosaic)
 
 
-@cli.command(name="update")
-def update_footprints(mosaic: Optional[str] = None):
+def get_datasets(mosaic=None):
     db = get_sync_database()
-
     Dataset = db.model.imagery_dataset
     datasets = db.session.query(Dataset)
     if mosaic is not None:
         datasets = datasets.filter(Dataset.mosaic == mosaic)
-    _datasets = (Path(d.path) for d in datasets.all())
+    return (Path(d.path) for d in datasets.all())
+
+
+@cli.command(name="update")
+def update_footprints(mosaic: Optional[str] = None):
+    _datasets = get_datasets(mosaic=mosaic)
     _update_footprints(_datasets, mosaic)
+
+
+@footprints.command(name="info")
+def get_info(mosaic: Optional[str] = None):
+    for dataset in get_datasets(mosaic=mosaic):
+        with rasterio.open(dataset) as ds:
+            print(str(dataset.name), ds.nodata)
+
+
+@footprints.command(name="add-nodata")
+def get_info(value: int, mosaic: Optional[str] = None):
+    for dataset in get_datasets(mosaic=mosaic):
+        with rasterio.open(dataset, "r+") as ds:
+            print(str(dataset.name))
+            if ds.nodata is not None:
+                print("[dim]Nodata value already set")
+                continue
+            ds.nodata = value
 
 
 _base = "postgresql://postgres:angry0405wombat@database:5432/"

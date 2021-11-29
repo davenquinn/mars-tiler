@@ -12,7 +12,7 @@ from .database import setup_database, get_database
 from .async_mosaic import AsyncMosaicFactory, get_datasets
 from .util import MarsCOGReader, ElevationReader
 from .mosaic import (
-    HiRISEMosaicBackend,
+    MarsMosaicBackend,
     ElevationMosaicBackend,
     mercator_tms,
     elevation_path,
@@ -70,7 +70,7 @@ def MosaicParams(mosaic: str = Query(..., description="Mosaic ID")) -> str:
 
 
 hirise_mosaic = AsyncMosaicFactory(
-    reader=HiRISEMosaicBackend,
+    reader=MarsMosaicBackend,
     path_dependency=MosaicParams,
     optional_headers=headers,
     dataset_dependency=HiRISEImageParams,

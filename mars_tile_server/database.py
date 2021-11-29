@@ -12,9 +12,10 @@ def get_sync_database():
     if getattr(db, "mapper") is None:
         db.automap()
         # We seem to have to remap public for changes to take hold...
-        db.mapper.reflect_schema("public")
+        # db.mapper.reflect_schema("public")
         db.mapper.reflect_schema("imagery")
         db.mapper.reflect_schema("public")
+        # OK, wait, we just have to map the public schema last...
     return db
 
 
