@@ -63,7 +63,7 @@ def _update_footprints(datasets, mosaic=None):
         db.session.commit()
 
 
-@footprints.command(name="calculate-footprints")
+@footprints.command(name="add")
 def add_footprints(datasets: List[Path], mosaic: Optional[str] = None):
     _update_footprints(datasets, mosaic)
 
