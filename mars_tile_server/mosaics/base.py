@@ -30,13 +30,9 @@ from mercantile import bounds
 
 from .timer import Timer
 from .defs import mars_tms
-from .database import get_database
+from .database import get_database, prepared_statement
 
 log = get_logger(__name__)
-
-
-def prepared_statement(id):
-    return open(relative_path(__file__, "sql", f"{id}.sql"), "r").read()
 
 
 async def get_datasets(tile, mosaic):
@@ -111,11 +107,8 @@ class AsyncBaseBackend(AsyncBaseReader):
         tile = self.tms.tile(lng, lat, self.quadkey_zoom)
         return await self.get_assets(tile.x, tile.y, tile.z)
 
-    async def _get_assets(self, tile: Tile) -> List[str]:
-        return await get_datasets(tile, self.mosaicid)
-
     async def get_assets(self, x: int, y: int, z: int) -> List[str]:
-        return await self._get_assets(Tile(x, y, z))
+        return await get_datasets(Tile(x, y, z), self.mosaicid)
 
     async def tile(  # type: ignore
         self,
@@ -188,8 +181,30 @@ class AsyncBaseBackend(AsyncBaseReader):
         raise NotImplementedError
 
 
-class AsyncMosaicBackend(AsyncBaseBackend):
-    ...
+class MultiMosaicBackend(AsyncBaseBackend):
+    async def tile(
+        self,
+        x: int,
+        y: int,
+        z: int,
+        mosaics: List[str] = [],
+        reverse: bool = False,
+        **kwargs: Any,
+    ) -> Tuple[ImageData, List[str]]:
+        """Get Tile from multiple observation."""
+        mosaic_assets = await self.assets_for_tile(x, y, z)
+        if not mosaic_assets:
+            raise NoAssetFoundError(f"No assets found for tile {z}-{x}-{y}")
+        if reverse:
+            mosaic_assets = list(reversed(mosaic_assets))
+
+        def _reader(asset: str, x: int, y: int, z: int, **kwargs: Any) -> ImageData:
+            with self.reader(asset, **self.reader_options) as src_dst:
+                return src_dst.tile(x, y, z, **kwargs)
+
+        data = mosaic_reader(mosaic_assets, _reader, x, y, z, **kwargs)
+        Timer.add_step("readdata")
+        return data
 
 
 def prepare_record(d):

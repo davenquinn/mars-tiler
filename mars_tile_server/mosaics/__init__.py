@@ -1,24 +1,10 @@
-from typing import List
-from cachetools import TTLCache, cached
-from cachetools.keys import hashkey
-from cogeo_mosaic.mosaic import MosaicJSON
-from cogeo_mosaic.cache import cache_config
-from cogeo_mosaic.backends import BaseBackend
-from morecantile import tms, Tile
-from geoalchemy2.functions import ST_MakeEnvelope, ST_SetSRID
-from sqlalchemy import and_, desc
-from sparrow.utils import get_logger, relative_path
+from morecantile import tms
+from sparrow.utils import get_logger
 from titiler.core.utils import Timer
-from sqlalchemy import text
-from asyncio import run, get_event_loop, create_task
-from concurrent.futures import ThreadPoolExecutor
-import os
 
 import attr
 from .async_mosaic import AsyncMosaicBackend
-from .defs import mars_tms
 from .util import MarsCOGReader, HiRISEReader, data_to_rgb
-from .database import get_database
 from .timer import Timer
 
 mercator_tms = tms.get("WebMercatorQuad")
