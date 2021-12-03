@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 from typing import Dict, Type
 from json import loads
+from pydantic import BaseModel
 
 import rasterio
 from rio_tiler.constants import MAX_THREADS
@@ -35,6 +36,11 @@ from .database import get_database, prepared_statement
 log = get_logger(__name__)
 
 
+class Dataset(BaseModel):
+    path: Path
+    mosaic: str
+
+
 async def get_datasets(tile, mosaic):
     if tile.z <= 8 and mosaic == "elevation_model":
         return [
@@ -60,7 +66,9 @@ async def get_datasets(tile, mosaic):
     )
     Timer.add_step("findassets")
     return [
-        str(d._mapping["path"]) for d in res if int(d._mapping["minzoom"]) - 4 < tile.z
+        Dataset(path=Path(d._mapping["path"]), mosaic=d._mapping["mosaic"])
+        for d in res
+        if int(d._mapping["minzoom"]) - 4 < tile.z
     ]
 
 
@@ -130,7 +138,9 @@ class AsyncBaseBackend(AsyncBaseReader):
             with self.reader(asset, **self.reader_options) as src_dst:
                 return src_dst.tile(x, y, z, **kwargs)
 
-        data = mosaic_reader(mosaic_assets, _reader, x, y, z, **kwargs)
+        data = mosaic_reader(
+            [str(d.path) for d in mosaic_assets], _reader, x, y, z, **kwargs
+        )
         Timer.add_step("readdata")
         return data
 
@@ -181,30 +191,8 @@ class AsyncBaseBackend(AsyncBaseReader):
         raise NotImplementedError
 
 
-class MultiMosaicBackend(AsyncBaseBackend):
-    async def tile(
-        self,
-        x: int,
-        y: int,
-        z: int,
-        mosaics: List[str] = [],
-        reverse: bool = False,
-        **kwargs: Any,
-    ) -> Tuple[ImageData, List[str]]:
-        """Get Tile from multiple observation."""
-        mosaic_assets = await self.assets_for_tile(x, y, z)
-        if not mosaic_assets:
-            raise NoAssetFoundError(f"No assets found for tile {z}-{x}-{y}")
-        if reverse:
-            mosaic_assets = list(reversed(mosaic_assets))
-
-        def _reader(asset: str, x: int, y: int, z: int, **kwargs: Any) -> ImageData:
-            with self.reader(asset, **self.reader_options) as src_dst:
-                return src_dst.tile(x, y, z, **kwargs)
-
-        data = mosaic_reader(mosaic_assets, _reader, x, y, z, **kwargs)
-        Timer.add_step("readdata")
-        return data
+class AsyncMosaicBackend(AsyncBaseBackend):
+    ...
 
 
 def prepare_record(d):

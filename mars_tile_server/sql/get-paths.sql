@@ -1,5 +1,6 @@
 SELECT
   "path",
+  mosaic,
   minzoom,
   maxzoom
 FROM imagery.dataset
