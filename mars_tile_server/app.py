@@ -8,7 +8,7 @@ from titiler.core.dependencies import DatasetParams, RenderParams, ResamplingNam
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 from titiler.mosaic.errors import MOSAIC_STATUS_CODES
 from titiler.core.resources.enums import OptionalHeader
-from .database import setup_database, get_database
+from .database import setup_database, get_sync_database
 from .async_mosaic import AsyncMosaicFactory, get_datasets
 from .util import MarsCOGReader, ElevationReader
 from .mosaic import (
@@ -126,6 +126,13 @@ async def dataset(mosaic: str, lon: float = None, lat: float = None, zoom: int =
         "tile": tile,
         "datasets": [d for d in datasets],
     }
+
+
+@app.get("/mosaic")
+def mosaics():
+    db = get_sync_database()
+    res = db.session.query(db.model.imagery_mosaic).all()
+    return list(res)
 
 
 add_exception_handlers(app, DEFAULT_STATUS_CODES)
