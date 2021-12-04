@@ -87,7 +87,11 @@ def update_footprints(mosaic: Optional[str] = None):
 def get_info(mosaic: Optional[str] = None):
     for dataset in get_datasets(mosaic=mosaic):
         with rasterio.open(dataset) as ds:
-            print(str(dataset.name), ds.nodata)
+            print(str(dataset.name))
+            print(ds.nodata)
+            print(ds.gcps)
+            print(f"[dim]{ds.crs}")
+            print()
 
 
 @footprints.command(name="add-nodata")
