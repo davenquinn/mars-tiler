@@ -1,7 +1,7 @@
 [tool.poetry]
 authors = ["Daven Quinn <dev@davenquinn.com>"]
 description = ""
-name = "mars-tile-server"
+name = "mars-tiler"
 version = "0.1.0"
 
 [tool.poetry.dependencies]
@@ -33,11 +33,11 @@ debugpy = "^1.5.1"
 trio = "^0.19.0"
 
 [tool.poetry.scripts]
-tile-server = "mars_tile_server:cli"
+tile-server = "mars_tiler:cli"
 
 [tool.pytest.ini_options]
 testpaths = [
-  "mars_tile_server",
+  "mars_tiler",
 ]
 
 [build-system]
