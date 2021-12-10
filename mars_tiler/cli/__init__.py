@@ -1,12 +1,15 @@
-from typer import Typer
+from typer import Typer, Argument, Context
 from typing import List, Optional
 from pathlib import Path
 from rich import print
 from time import sleep
+from os import environ
+from json import loads
+from dataclasses import dataclass
 
 from geoalchemy2.shape import from_shape
 from shapely.geometry import shape
-from sparrow.utils import relative_path
+from sparrow.utils import relative_path, cmd
 from sparrow.dinosaur import Dinosaur
 
 from ..database import get_sync_database
@@ -34,11 +37,30 @@ def create_tables():
     initialize_database()
 
 
-footprints = Typer()
-cli.add_typer(footprints, name="images")
+images = Typer(no_args_is_help=True)
+cli.add_typer(images, name="images")
+
+@dataclass
+class CommandContext:
+    search: str = None
+    mosaic: str = None
+    @property
+    def datasets(self):
+        return get_datasets(search_string=self.search, mosaic=self.mosaic)
 
 
-def _update_footprints(datasets, mosaic=None):
+@images.callback()
+def images_main(ctx: Context, search: str = None, mosaic: str = None):
+    """
+    Manage images.
+    """
+    ctx.obj = CommandContext(search, mosaic)
+
+def get_json_info(dataset: Path):
+    output = cmd("gdalinfo -json -approx_stats", str(dataset), capture_output=True)
+    return loads(output.stdout)
+
+def _update_info(datasets, mosaic=None):
     db = get_sync_database()
     Dataset = db.model.imagery_dataset
     footprints = get_footprints(datasets)
@@ -63,46 +85,58 @@ def _update_footprints(datasets, mosaic=None):
         db.session.commit()
 
 
-@footprints.command(name="add")
+@images.command(name="add")
 def add_footprints(datasets: List[Path], mosaic: Optional[str] = None):
-    _update_footprints(datasets, mosaic)
+    _update_info(datasets, mosaic)
 
 
-def get_datasets(mosaic=None):
+def get_datasets(*, search_string: str = None, mosaic=None):
     db = get_sync_database()
     Dataset = db.model.imagery_dataset
     datasets = db.session.query(Dataset)
     if mosaic is not None:
         datasets = datasets.filter(Dataset.mosaic == mosaic)
-    return (Path(d.path) for d in datasets.all())
+    if search_string is not None:
+        datasets = datasets.filter(Dataset.name.contains(search_string))
+    return (Path(d.path) for d in datasets)
 
 
 @cli.command(name="update")
-def update_footprints(mosaic: Optional[str] = None):
-    _datasets = get_datasets(mosaic=mosaic)
-    _update_footprints(_datasets, mosaic)
+def update_info(ctx: Context):
+    obj = ctx.find_object(CommandContext)
+    _update_info(obj.datasets, mosaic=obj.mosaic)
 
 
-@footprints.command(name="info")
-def get_info(mosaic: Optional[str] = None):
-    for dataset in get_datasets(mosaic=mosaic):
+@images.command(name="info")
+def get_info(ctx: Context, full: bool = False):
+    obj = ctx.find_object(CommandContext)
+    for dataset in obj.datasets:
         with rasterio.open(dataset) as ds:
             print(str(dataset.name))
             print(ds.nodata)
-            print(ds.gcps)
             print(f"[dim]{ds.crs}")
+            if full:
+                print(get_json_info(dataset))
             print()
 
-@footprints.command(name="paths")
-def paths(mosaic: Optional[str] = None):
-    for dataset in get_datasets(mosaic=mosaic):
+@images.command(name="paths")
+def paths(ctx: Context, full: bool = False):
+    obj = ctx.find_object(CommandContext)
+
+    public_url = environ.get("PUBLIC_URL")
+    mars_data = environ.get("MARS_DATA_DIR")
+    for dataset in obj.datasets:
         with rasterio.open(dataset) as ds:
-            print(str(dataset))
+            fp = str(dataset)
+            if full:
+                fp = fp.replace(mars_data, public_url)
+            print(fp)
 
 
-@footprints.command(name="add-nodata")
-def get_info(value: int, mosaic: Optional[str] = None):
-    for dataset in get_datasets(mosaic=mosaic):
+@images.command(name="add-nodata")
+def add_nodata(ctx: Context, value: int):
+    ctx.find_object(CommandContext)
+    for dataset in ctx.datasets:
         with rasterio.open(dataset, "r+") as ds:
             print(str(dataset.name))
             if ds.nodata is not None:
