@@ -93,6 +93,12 @@ def get_info(mosaic: Optional[str] = None):
             print(f"[dim]{ds.crs}")
             print()
 
+@footprints.command(name="paths")
+def paths(mosaic: Optional[str] = None):
+    for dataset in get_datasets(mosaic=mosaic):
+        with rasterio.open(dataset) as ds:
+            print(str(dataset))
+
 
 @footprints.command(name="add-nodata")
 def get_info(value: int, mosaic: Optional[str] = None):
