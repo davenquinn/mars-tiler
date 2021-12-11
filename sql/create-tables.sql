@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS imagery.dataset (
   maxzoom integer,
   dtype text,
   footprint geometry(Polygon, 949900),
-  info jsonb
+  info jsonb,
+  rescale_range numeric[]
 );
 
 CREATE INDEX imagery_dataset_footprint_idx
