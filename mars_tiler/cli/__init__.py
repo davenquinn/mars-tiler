@@ -21,7 +21,7 @@ import sys
 
 # logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
-cli = Typer()
+cli = Typer(no_args_is_help=True)
 
 cli.add_typer(mosaic_cli, name="create-mosaic")
 
@@ -77,6 +77,7 @@ def _update_info(datasets, mosaic=None):
 
         if mosaic is not None:
             kw["mosaic"] = mosaic
+        kw["info"] = get_json_info(path)
 
         dataset = db.get_or_create(Dataset, name=path.stem)
         for k, v in kw.items():
@@ -101,7 +102,7 @@ def get_datasets(*, search_string: str = None, mosaic=None):
     return (Path(d.path) for d in datasets)
 
 
-@cli.command(name="update")
+@images.command(name="update")
 def update_info(ctx: Context):
     obj = ctx.find_object(CommandContext)
     _update_info(obj.datasets, mosaic=obj.mosaic)
@@ -145,20 +146,22 @@ def add_nodata(ctx: Context, value: int):
             ds.nodata = value
 
 
-_base = "postgresql://postgres:angry0405wombat@database:5432/"
 
 
-class Migrator(Dinosaur):
-    target_url = _base + "footprints_temp_migration"
-    dry_run_url = _base + "footprints_schema_clone"
 
 
 @cli.command(name="migrate")
 def migrate(force: bool = False):
     db = get_sync_database()
-    kwargs = dict(dry_run=False, apply=False)
+    kwargs = dict(dry_run=True, apply=False)
     if force:
         kwargs["apply"] = True
 
-    migrator = Migrator(db, initialize_database, migrations=[])
+    _base = environ.get("FOOTPRINTS_DATABASE")
+
+    class Migrator(Dinosaur):
+        target_url = _base + "_temp_migration"
+        dry_run_url = _base + "_schema_clone"
+
+    migrator = Migrator(db, initialize_database, migrations=[], schema=["imagery"])
     migrator.run_migration(**kwargs)
