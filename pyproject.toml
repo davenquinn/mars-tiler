@@ -27,9 +27,9 @@ uvicorn = "^0.15.0"
 [tool.poetry.dev-dependencies]
 anyio = "^3.3.4"
 debugpy = "^1.5.1"
-"sparrow.birdbrain" = {path = "./python-tools/birdbrain", develop = true}
-"sparrow.dinosaur" = {path = "./python-tools/dinosaur", develop = true}
-"sparrow.utils" = {path = "./python-tools/utils", develop = true}
+"sparrow.birdbrain" = {path = "./deps/python-tools/birdbrain", develop = true}
+"sparrow.dinosaur" = {path = "./deps/python-tools/dinosaur", develop = true}
+"sparrow.utils" = {path = "./deps/python-tools/utils", develop = true}
 trio = "^0.19.0"
 
 [tool.poetry.scripts]
