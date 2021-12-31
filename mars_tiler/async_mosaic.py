@@ -31,6 +31,7 @@ from mercantile import bounds
 from .timer import Timer
 from .defs import mars_tms
 from .database import get_database
+from .util import dataset_path
 
 log = get_logger(__name__)
 
@@ -39,10 +40,18 @@ def prepared_statement(id):
     return open(relative_path(__file__, "sql", f"{id}.sql"), "r").read()
 
 
+def get_path(d: str):
+    value = str(d)
+    prefix = "/mars-data"
+    if value.startswith(prefix):
+        return dataset_path(str(value[len(prefix) :]))
+    return value
+
+
 async def get_datasets(tile, mosaic):
     if tile.z <= 8 and mosaic == "elevation_model":
         return [
-            "/mars-data/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif"
+            dataset_path("/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif")
         ]
 
     bbox = bounds(tile.x, tile.y, tile.z)
@@ -64,7 +73,9 @@ async def get_datasets(tile, mosaic):
     )
     Timer.add_step("findassets")
     return [
-        str(d._mapping["path"]) for d in res if int(d._mapping["minzoom"]) - 4 < tile.z
+        get_path(d._mapping["path"])
+        for d in res
+        if int(d._mapping["minzoom"]) - 4 < tile.z
     ]
 
 

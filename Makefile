@@ -8,4 +8,4 @@ test:
 	poetry run pytest --log-cli-level=INFO --show-capture=stdout --durations=10
 
 run:
-	./run-local
+	./scripts/run-docker
