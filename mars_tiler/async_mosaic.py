@@ -14,6 +14,7 @@ from titiler.mosaic.resources.enums import PixelSelectionMethod
 from fastapi import Depends, Path, Query
 from starlette.responses import Response, JSONResponse
 from typing import Any, Dict, List, Tuple, Type
+from fastapi.encoders import jsonable_encoder
 
 import attr
 from morecantile import TileMatrixSet, Tile
@@ -36,9 +37,12 @@ from .database import get_database
 
 log = get_logger(__name__)
 
-
+stmt_cache = {}
 def prepared_statement(id):
-    return open(relative_path(__file__, "sql", f"{id}.sql"), "r").read()
+    cached = stmt_cache.get(id)
+    if cached is None:
+        stmt_cache[id] = open(relative_path(__file__, "sql", f"{id}.sql"), "r").read()
+    return stmt_cache[id]
 
 class MosaicAsset(BaseModel):
     path: str
@@ -48,16 +52,13 @@ class MosaicAsset(BaseModel):
     maxzoom: int
 
 def create_asset(d):
-    print(d)
-    mosaic = d._mapping.get("mosaic")
-    if mosaic is not None:
-        mosaic = str(mosaic)
+    row = dict(d)
     return MosaicAsset(
-        path=d._mapping["path"],
-        mosaic=mosaic,
-        rescale_range=d._mapping.get("rescale_range", None),
-        minzoom=int(d._mapping["minzoom"]),
-        maxzoom=int(d._mapping["maxzoom"])
+        path=row["path"],
+        mosaic=str(row["mosaic"]),
+        rescale_range=row.get("rescale_range", None),
+        minzoom=int(row["minzoom"]),
+        maxzoom=int(row["maxzoom"])
     )
 
 
@@ -354,7 +355,7 @@ class AsyncMosaicFactory(MosaicTilerFactory):
             headers = {}
             headers["Server-Timing"] = timer.server_timings()
             return JSONResponse(
-                {"assets": [a.path for a in assets], "xy_bounds": bbox, "envelope": env, "mosaics": src_path}, headers=headers
+                {"assets": [jsonable_encoder(a) for a in assets], "xy_bounds": bbox, "envelope": env, "mosaics": src_path}, headers=headers
             )
 
         @self.router.get(

@@ -67,7 +67,9 @@ def SingleMosaicParams(mosaic: str = Query(..., description="Mosaic ID")) -> Lis
     """Mosaic ID"""
     return [mosaic]
 
-def MultiMosaicParams(mosaic: str = Query([], title="Mosaics", description="comma-delimited mosaics to include")) -> List[str]:
+def MultiMosaicParams(mosaic: str = Query("", title="Mosaics", description="comma-delimited mosaics to include")) -> List[str]:
+    if mosaic == "":
+        return []
     return mosaic.split(",")
 
 
@@ -76,7 +78,7 @@ single_mosaic = AsyncMosaicFactory(
     path_dependency=SingleMosaicParams,
     optional_headers=headers,
     dataset_dependency=ImageryDatasetParams,
-    #render_dependency=ImageryRenderParams,
+    render_dependency=HiRISERenderParams,
 )
 
 multi_mosaic = AsyncMosaicFactory(

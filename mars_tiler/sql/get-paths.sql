@@ -2,7 +2,7 @@ SELECT
   "path",
   minzoom,
   maxzoom,
-  rescale_range
+  rescale_range,
   mosaic
 FROM imagery.dataset
 WHERE ST_Intersects(
