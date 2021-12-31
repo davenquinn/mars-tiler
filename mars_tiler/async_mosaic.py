@@ -28,6 +28,7 @@ from cogeo_mosaic.errors import NoAssetFoundError
 from sparrow.utils import relative_path, get_logger
 from mercantile import bounds
 from pydantic import BaseModel
+from operator import attrgetter
 
 from .timer import Timer
 from .defs import mars_tms
@@ -41,6 +42,7 @@ def prepared_statement(id):
 
 class MosaicAsset(BaseModel):
     path: str
+    mosaic: str
     rescale_range: Optional[List[float]]
     minzoom: int
     maxzoom: int
@@ -48,12 +50,15 @@ class MosaicAsset(BaseModel):
 def create_asset(d):
     return MosaicAsset(
         path=d._mapping["path"],
+        mosaic=d._mapping["mosaic"],
         rescale_range=d._mapping["rescale_range"],
         minzoom=int(d._mapping["minzoom"]),
         maxzoom=int(d._mapping["maxzoom"])
     )
 
-async def get_datasets(tile, mosaic)-> List[MosaicAsset]:
+
+
+async def get_datasets(tile, mosaics: List[str])-> List[MosaicAsset]:
     bbox = bounds(tile.x, tile.y, tile.z)
 
     # Morecantile is really slow!
@@ -64,7 +69,6 @@ async def get_datasets(tile, mosaic)-> List[MosaicAsset]:
     res = await db.fetch_all(
         query=prepared_statement("get-paths"),
         values=dict(
-            mosaic=mosaic,
             x1=bbox.west,
             y1=bbox.south,
             x2=bbox.east,
@@ -73,7 +77,17 @@ async def get_datasets(tile, mosaic)-> List[MosaicAsset]:
     )
     Timer.add_step("findassets")
 
-    return [create_asset(d) for d in res if int(d._mapping["minzoom"]) - 4 < tile.z]
+    assets = [
+        create_asset(d) 
+        for d in res
+        if int(d._mapping["minzoom"]) - 4 < tile.z 
+        and str(d._mapping["mosaic"]) in mosaics]
+
+    reordered_assets = []
+    for mos in mosaics:
+        reordered_assets += [a for a in assets if a.mosaic == mos]
+
+    return reordered_assets
 
 def rescale_postprocessor(asset: MosaicAsset):
     rng = asset.rescale_range
@@ -99,7 +113,7 @@ class AsyncBaseBackend(AsyncBaseReader):
 
     """
 
-    mosaicid: str = attr.ib()
+    mosaics: List[str] = attr.ib()
 
     reader: Type[BaseReader] = attr.ib(default=COGReader)
     reader_options: Dict = attr.ib(factory=dict)
@@ -127,7 +141,7 @@ class AsyncBaseBackend(AsyncBaseReader):
         return await self.get_assets(tile.x, tile.y, tile.z)
 
     async def _get_assets(self, tile: Tile) -> List[MosaicAsset]:
-        return await get_datasets(tile, self.mosaicid)
+        return await get_datasets(tile, self.mosaics)
 
     async def get_assets(self, x: int, y: int, z: int) -> List[MosaicAsset]:
         return await self._get_assets(Tile(x, y, z))

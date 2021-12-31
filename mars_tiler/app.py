@@ -66,7 +66,7 @@ class HiRISERenderParams(RenderParams):
 
 def MosaicParams(mosaic: str = Query(..., description="Mosaic ID")) -> str:
     """Mosaic ID"""
-    return mosaic
+    return [mosaic]
 
 
 hirise_mosaic = AsyncMosaicFactory(
@@ -97,7 +97,7 @@ class ElevationMosaicParams(DatasetParams):
 
 # This is the main dataset
 elevation_mosaic = AsyncMosaicFactory(
-    path_dependency=lambda: "elevation_model",
+    path_dependency=lambda: ["elevation_model"],
     dataset_dependency=ElevationMosaicParams,
     reader=ElevationMosaicBackend,
     optional_headers=headers,
@@ -118,7 +118,7 @@ async def dataset(mosaic: str, lon: float = None, lat: float = None, zoom: int =
     xy_bounds = mercator_tms.xy_bounds(tile)
     bounds = mercator_tms.bounds(tile)
 
-    datasets = await get_datasets(tile, mosaic)
+    datasets = await get_datasets(tile, [mosaic])
 
     return {
         "mercator_bounds": xy_bounds,
