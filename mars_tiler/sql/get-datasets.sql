@@ -7,4 +7,4 @@ SELECT
  'Feature' "type",
  ST_AsGeoJSON(ST_SetSRID(footprint, 0))::json geometry
 FROM imagery.dataset
-WHERE mosaic = any(:mosaic::text[])
+WHERE mosaic = any(:mosaic)
