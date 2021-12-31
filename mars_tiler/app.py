@@ -47,13 +47,12 @@ def HiRISEParams(
 
 
 @dataclass
-class HiRISEImageParams(DatasetParams):
-    """Low level WarpedVRT Optional parameters."""
-
-    # nodata: Optional[Union[str, int, float]] = Query(
-    #     0, title="Nodata value", description="Overwrite internal Nodata value"
-    # )
-
+class ImageryDatasetParams(DatasetParams):
+    resampling_method: ResamplingName = Query(
+        ResamplingName.bilinear,  # type: ignore
+        alias="resampling",
+        description="Resampling method.",
+    )
 
 @dataclass
 class HiRISERenderParams(RenderParams):
@@ -64,26 +63,37 @@ class HiRISERenderParams(RenderParams):
     )
 
 
-def MosaicParams(mosaic: str = Query(..., description="Mosaic ID")) -> str:
+def SingleMosaicParams(mosaic: str = Query(..., description="Mosaic ID")) -> List[str]:
     """Mosaic ID"""
     return [mosaic]
 
+def MultiMosaicParams(mosaic: str = Query([], title="Mosaics", description="comma-delimited mosaics to include")) -> List[str]:
+    return mosaic.split(",")
 
-hirise_mosaic = AsyncMosaicFactory(
+
+single_mosaic = AsyncMosaicFactory(
     reader=MarsMosaicBackend,
-    path_dependency=MosaicParams,
+    path_dependency=SingleMosaicParams,
     optional_headers=headers,
-    dataset_dependency=HiRISEImageParams,
-    render_dependency=HiRISERenderParams,
+    dataset_dependency=ImageryDatasetParams,
+    #render_dependency=ImageryRenderParams,
+)
+
+multi_mosaic = AsyncMosaicFactory(
+    reader=MarsMosaicBackend,
+    path_dependency=MultiMosaicParams,
+    optional_headers=headers,
+    dataset_dependency=ImageryDatasetParams,
+    #render_dependency=ImageryRenderParams, 
 )
 
 hirise_cog = TilerFactory(
     reader=MarsCOGReader,
     path_dependency=HiRISEParams,
-    dataset_dependency=HiRISEImageParams,
+    dataset_dependency=ImageryDatasetParams,
     render_dependency=HiRISERenderParams,
 )
-app.include_router(hirise_cog.router, tags=["HiRISE images"], prefix="/hirise")
+app.include_router(hirise_cog.router, tags=["Single HiRISE images"], prefix="/hirise")
 
 
 @dataclass
@@ -107,7 +117,11 @@ app.include_router(
 )
 
 app.include_router(
-    hirise_mosaic.router, tags=["Imagery Mosaic"], prefix="/mosaic/{mosaic}"
+    multi_mosaic.router, tags=["Multi-Mosaic"], prefix="/mosaic"
+)
+
+app.include_router(
+    single_mosaic.router, tags=["Imagery Mosaic"], prefix="/mosaic/{mosaic}"
 )
 app.include_router(cog.router, tags=["Global DEM"], prefix="/elevation-global")
 

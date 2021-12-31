@@ -42,16 +42,20 @@ def prepared_statement(id):
 
 class MosaicAsset(BaseModel):
     path: str
-    mosaic: str
+    mosaic: Optional[str]
     rescale_range: Optional[List[float]]
     minzoom: int
     maxzoom: int
 
 def create_asset(d):
+    print(d)
+    mosaic = d._mapping.get("mosaic")
+    if mosaic is not None:
+        mosaic = str(mosaic)
     return MosaicAsset(
         path=d._mapping["path"],
-        mosaic=d._mapping["mosaic"],
-        rescale_range=d._mapping["rescale_range"],
+        mosaic=mosaic,
+        rescale_range=d._mapping.get("rescale_range", None),
         minzoom=int(d._mapping["minzoom"]),
         maxzoom=int(d._mapping["maxzoom"])
     )
@@ -73,6 +77,7 @@ async def get_datasets(tile, mosaics: List[str])-> List[MosaicAsset]:
             y1=bbox.south,
             x2=bbox.east,
             y2=bbox.north,
+            mosaics=mosaics
         ),
     )
     Timer.add_step("findassets")
@@ -80,13 +85,16 @@ async def get_datasets(tile, mosaics: List[str])-> List[MosaicAsset]:
     assets = [
         create_asset(d) 
         for d in res
-        if int(d._mapping["minzoom"]) - 4 < tile.z 
-        and str(d._mapping["mosaic"]) in mosaics]
+        if int(d._mapping["minzoom"]) - 4 < tile.z
+    ]
+        #and d._mapping.get("mosaic", None) in mosaics]
 
-    reordered_assets = []
+    if len(mosaics) == 1:
+        return assets
+    # Reorder assets to ensure that mosaics listed first are put on top
+    reordered_assets = assets
     for mos in mosaics:
-        reordered_assets += [a for a in assets if a.mosaic == mos]
-
+       reordered_assets += [a for a in assets if a.mosaic == mos]
     return reordered_assets
 
 def rescale_postprocessor(asset: MosaicAsset):
@@ -346,7 +354,7 @@ class AsyncMosaicFactory(MosaicTilerFactory):
             headers = {}
             headers["Server-Timing"] = timer.server_timings()
             return JSONResponse(
-                {"assets": assets, "xy_bounds": bbox, "envelope": env}, headers=headers
+                {"assets": [a.path for a in assets], "xy_bounds": bbox, "envelope": env, "mosaics": src_path}, headers=headers
             )
 
         @self.router.get(
