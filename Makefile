@@ -6,3 +6,6 @@ install:
 
 test:
 	poetry run pytest --log-cli-level=INFO --show-capture=stdout --durations=10
+
+run:
+	./scripts/run-docker

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, Union, List
 import logging
+import os
 
 from fastapi import FastAPI, Query
 from titiler.core.factory import TilerFactory
@@ -10,7 +11,7 @@ from titiler.mosaic.errors import MOSAIC_STATUS_CODES
 from titiler.core.resources.enums import OptionalHeader
 from .database import setup_database, get_sync_database
 from .async_mosaic import AsyncMosaicFactory, get_datasets
-from .util import MarsCOGReader, ElevationReader
+from .util import MarsCOGReader, ElevationReader, dataset_path
 from .mosaic import (
     MarsMosaicBackend,
     ElevationMosaicBackend,
@@ -19,8 +20,8 @@ from .mosaic import (
 )
 
 
-def build_path():
-    return "/mars-data/hirise-images/hirise-red.mosaic.json"
+def build_path(*args):
+    return dataset_path("/hirise-images/hirise-red.mosaic.json")
 
 
 headers = {OptionalHeader.server_timing, OptionalHeader.x_assets}
@@ -43,7 +44,7 @@ def HiRISEParams(
     image_id: str = Query(..., description="HiRISE image ID"), image_type: str = "RED"
 ) -> str:
     """Create dataset path from args"""
-    return f"/mars-data/hirise-images/{image_id}_{image_type}.tif"
+    return dataset_path(f"/hirise-images/{image_id}_{image_type}.tif")
 
 
 @dataclass
