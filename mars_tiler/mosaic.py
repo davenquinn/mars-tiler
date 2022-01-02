@@ -27,7 +27,7 @@ log = get_logger(__name__)
 
 
 def elevation_path():
-    return "/mars-data/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif"
+    return ["/mars-data/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif"]
 
 
 @attr.s

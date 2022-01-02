@@ -46,7 +46,7 @@ class CommandContext:
     mosaic: str = None
     @property
     def datasets(self):
-        return get_datasets(search_string=self.search, mosaic=self.mosaic)
+        return get_datasets(search_string=self.search, mosaic=[self.mosaic])
 
 
 @images.callback()

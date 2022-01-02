@@ -14,6 +14,7 @@ from titiler.mosaic.resources.enums import PixelSelectionMethod
 from fastapi import Depends, Path, Query
 from starlette.responses import Response, JSONResponse
 from typing import Any, Dict, List, Tuple, Type
+from fastapi.encoders import jsonable_encoder
 
 import attr
 from morecantile import TileMatrixSet, Tile
@@ -28,6 +29,7 @@ from cogeo_mosaic.errors import NoAssetFoundError
 from sparrow.utils import relative_path, get_logger
 from mercantile import bounds
 from pydantic import BaseModel
+from operator import attrgetter
 
 from .timer import Timer
 from .defs import mars_tms
@@ -35,25 +37,33 @@ from .database import get_database
 
 log = get_logger(__name__)
 
-
+stmt_cache = {}
 def prepared_statement(id):
-    return open(relative_path(__file__, "sql", f"{id}.sql"), "r").read()
+    cached = stmt_cache.get(id)
+    if cached is None:
+        stmt_cache[id] = open(relative_path(__file__, "sql", f"{id}.sql"), "r").read()
+    return stmt_cache[id]
 
 class MosaicAsset(BaseModel):
     path: str
+    mosaic: Optional[str]
     rescale_range: Optional[List[float]]
     minzoom: int
     maxzoom: int
 
 def create_asset(d):
+    row = dict(d)
     return MosaicAsset(
-        path=d._mapping["path"],
-        rescale_range=d._mapping["rescale_range"],
-        minzoom=int(d._mapping["minzoom"]),
-        maxzoom=int(d._mapping["maxzoom"])
+        path=row["path"],
+        mosaic=str(row["mosaic"]),
+        rescale_range=row.get("rescale_range", None),
+        minzoom=int(row["minzoom"]),
+        maxzoom=int(row["maxzoom"])
     )
 
-async def get_datasets(tile, mosaic)-> List[MosaicAsset]:
+
+
+async def get_datasets(tile, mosaics: List[str])-> List[MosaicAsset]:
     bbox = bounds(tile.x, tile.y, tile.z)
 
     # Morecantile is really slow!
@@ -64,16 +74,29 @@ async def get_datasets(tile, mosaic)-> List[MosaicAsset]:
     res = await db.fetch_all(
         query=prepared_statement("get-paths"),
         values=dict(
-            mosaic=mosaic,
             x1=bbox.west,
             y1=bbox.south,
             x2=bbox.east,
             y2=bbox.north,
+            mosaics=mosaics
         ),
     )
     Timer.add_step("findassets")
 
-    return [create_asset(d) for d in res if int(d._mapping["minzoom"]) - 4 < tile.z]
+    assets = [
+        create_asset(d) 
+        for d in res
+        if int(d._mapping["minzoom"]) - 4 < tile.z
+    ]
+        #and d._mapping.get("mosaic", None) in mosaics]
+
+    if len(mosaics) == 1:
+        return assets
+    # Reorder assets to ensure that mosaics listed first are put on top
+    reordered_assets = assets
+    for mos in mosaics:
+       reordered_assets += [a for a in assets if a.mosaic == mos]
+    return reordered_assets
 
 def rescale_postprocessor(asset: MosaicAsset):
     rng = asset.rescale_range
@@ -99,7 +122,7 @@ class AsyncBaseBackend(AsyncBaseReader):
 
     """
 
-    mosaicid: str = attr.ib()
+    mosaics: List[str] = attr.ib()
 
     reader: Type[BaseReader] = attr.ib(default=COGReader)
     reader_options: Dict = attr.ib(factory=dict)
@@ -127,7 +150,7 @@ class AsyncBaseBackend(AsyncBaseReader):
         return await self.get_assets(tile.x, tile.y, tile.z)
 
     async def _get_assets(self, tile: Tile) -> List[MosaicAsset]:
-        return await get_datasets(tile, self.mosaicid)
+        return await get_datasets(tile, self.mosaics)
 
     async def get_assets(self, x: int, y: int, z: int) -> List[MosaicAsset]:
         return await self._get_assets(Tile(x, y, z))
@@ -332,7 +355,7 @@ class AsyncMosaicFactory(MosaicTilerFactory):
             headers = {}
             headers["Server-Timing"] = timer.server_timings()
             return JSONResponse(
-                {"assets": assets, "xy_bounds": bbox, "envelope": env}, headers=headers
+                {"assets": [jsonable_encoder(a) for a in assets], "xy_bounds": bbox, "envelope": env, "mosaics": src_path}, headers=headers
             )
 
         @self.router.get(
