@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bash -e
 
-docker build -t mars_tile_server .
-docker run --rm -it -p 8000:8000 --env-file .env mars_tile_server $@
+docker build -t mars_tiler .
+docker run --rm -it -p 8000:8000 --env-file .env mars_tiler $@
 

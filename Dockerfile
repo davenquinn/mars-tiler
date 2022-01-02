@@ -8,26 +8,20 @@ FROM python:3.9-bullseye
 
 WORKDIR /code
 
-RUN apt-get update && \
-  pip install "poetry==1.1.11" && \
+RUN pip install "poetry==1.1.11" && \
   rm -rf /var/lib/apt/lists/* && \
-  poetry config virtualenvs.create false && \
-  update-ca-certificates -f -v
+  poetry config virtualenvs.create false
 
-# First, install python tools
+# Fix ca certificates error for LetsEncrypt (late 2021/early 2022 hotfix)
+# https://stackoverflow.com/questions/69408776/how-to-force-older-debian-to-forget-about-dst-root-ca-x3-expiration-and-use-isrg
+RUN apt update \
+  && apt install -y ca-certificates \
+  && sed -i '/^mozilla\/DST_Root_CA_X3.crt$/ s/^/!/' /etc/ca-certificates.conf \
+  && update-ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install python tools
 COPY ./deps/python-tools ./deps/python-tools/
-
-# COPY ./python-tools/utils /python-tools/utils
-# WORKDIR /python-tools/utils
-# RUN poetry install --no-interaction --no-ansi --no-root
-
-# COPY ./python-tools/birdbrain/poetry.lock ./python-tools/birdbrain/pyproject.toml /python-tools/birdbrain/
-# WORKDIR /python-tools/birdbrain
-# RUN poetry install --no-interaction --no-ansi --no-root
-
-# COPY ./python-tools/dinosaur/poetry.lock ./python-tools/dinosaur/pyproject.toml /python-tools/dinosaur/
-# WORKDIR /python-tools/dinosaur
-# RUN poetry install --no-interaction --no-ansi --no-root
 
 ENV PIP_DEFAULT_TIMEOUT=100 \
   PIP_DISABLE_PIP_VERSION_CHECK=1
