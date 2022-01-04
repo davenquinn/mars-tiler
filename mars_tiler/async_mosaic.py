@@ -86,9 +86,14 @@ async def get_datasets(tile, mosaics: List[str])-> List[MosaicAsset]:
     assets = [
         create_asset(d) 
         for d in res
-        if int(d._mapping["minzoom"]) - 4 < tile.z
+        if int(d._mapping["minzoom"]) - 5 < tile.z
     ]
         #and d._mapping.get("mosaic", None) in mosaics]
+
+    # If all assets are overscaled, we return nothing.
+    overscaled_assets = [a for a in assets if tile.z > a.maxzoom]
+    if len(overscaled_assets) == len(assets):
+        return []
 
     if len(mosaics) == 1:
         return assets
