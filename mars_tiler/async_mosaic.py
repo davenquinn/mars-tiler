@@ -34,15 +34,19 @@ from operator import attrgetter
 from .timer import Timer
 from .defs import mars_tms
 from .database import get_database
+from .util import dataset_path
 
 log = get_logger(__name__)
 
 stmt_cache = {}
+
+
 def prepared_statement(id):
     cached = stmt_cache.get(id)
     if cached is None:
         stmt_cache[id] = open(relative_path(__file__, "sql", f"{id}.sql"), "r").read()
     return stmt_cache[id]
+
 
 class MosaicAsset(BaseModel):
     path: str
@@ -51,19 +55,34 @@ class MosaicAsset(BaseModel):
     minzoom: int
     maxzoom: int
 
+
 def create_asset(d):
     row = dict(d)
     return MosaicAsset(
-        path=row["path"],
+        path=get_path(row["path"]),
         mosaic=str(row["mosaic"]),
         rescale_range=row.get("rescale_range", None),
         minzoom=int(row["minzoom"]),
-        maxzoom=int(row["maxzoom"])
+        maxzoom=int(row["maxzoom"]),
     )
 
 
+def get_path(d: str):
+    value = str(d)
+    prefix = "/mars-data"
+    if value.startswith(prefix):
+        return dataset_path(str(value[len(prefix) :]))
+    return value
 
-async def get_datasets(tile, mosaics: List[str])-> List[MosaicAsset]:
+
+async def get_datasets(tile, mosaic):
+    if tile.z <= 8 and mosaic == "elevation_model":
+        return [
+            dataset_path("/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif")
+        ]
+
+
+async def get_datasets(tile, mosaics: List[str]) -> List[MosaicAsset]:
     bbox = bounds(tile.x, tile.y, tile.z)
 
     # Morecantile is really slow!
@@ -74,21 +93,13 @@ async def get_datasets(tile, mosaics: List[str])-> List[MosaicAsset]:
     res = await db.fetch_all(
         query=prepared_statement("get-paths"),
         values=dict(
-            x1=bbox.west,
-            y1=bbox.south,
-            x2=bbox.east,
-            y2=bbox.north,
-            mosaics=mosaics
+            x1=bbox.west, y1=bbox.south, x2=bbox.east, y2=bbox.north, mosaics=mosaics
         ),
     )
     Timer.add_step("findassets")
 
-    assets = [
-        create_asset(d) 
-        for d in res
-        if int(d._mapping["minzoom"]) - 5 < tile.z
-    ]
-        #and d._mapping.get("mosaic", None) in mosaics]
+    assets = [create_asset(d) for d in res if int(d._mapping["minzoom"]) - 5 < tile.z]
+    # and d._mapping.get("mosaic", None) in mosaics]
 
     # If all assets are overscaled, we return nothing.
     overscaled_assets = [a for a in assets if tile.z > a.maxzoom]
@@ -100,16 +111,20 @@ async def get_datasets(tile, mosaics: List[str])-> List[MosaicAsset]:
     # Reorder assets to ensure that mosaics listed first are put on top
     reordered_assets = assets
     for mos in mosaics:
-       reordered_assets += [a for a in assets if a.mosaic == mos]
+        reordered_assets += [a for a in assets if a.mosaic == mos]
     return reordered_assets
+
 
 def rescale_postprocessor(asset: MosaicAsset):
     rng = asset.rescale_range
+
     def processor(data, mask):
         if rng is not None:
-            data = ((data - rng[0]) * (1/(rng[1] - rng[0]) * 255)).astype('uint8')
+            data = ((data - rng[0]) * (1 / (rng[1] - rng[0]) * 255)).astype("uint8")
         return data, mask
+
     return processor
+
 
 @attr.s
 class AsyncBaseBackend(AsyncBaseReader):
@@ -176,8 +191,14 @@ class AsyncBaseBackend(AsyncBaseReader):
         if reverse:
             mosaic_assets = list(reversed(mosaic_assets))
 
-        def _reader(asset: MosaicAsset, x: int, y: int, z: int, **kwargs: Any) -> ImageData:
-            with self.reader(asset.path, post_process=rescale_postprocessor(asset), **self.reader_options) as src_dst:
+        def _reader(
+            asset: MosaicAsset, x: int, y: int, z: int, **kwargs: Any
+        ) -> ImageData:
+            with self.reader(
+                asset.path,
+                post_process=rescale_postprocessor(asset),
+                **self.reader_options,
+            ) as src_dst:
                 return src_dst.tile(x, y, z, **kwargs)
 
         data = mosaic_reader(mosaic_assets, _reader, x, y, z, **kwargs)
@@ -200,7 +221,11 @@ class AsyncBaseBackend(AsyncBaseReader):
             mosaic_assets = list(reversed(mosaic_assets))
 
         def _reader(asset: MosaicAsset, lon: float, lat: float, **kwargs) -> Dict:
-            with self.reader(asset.path, post_process=rescale_postprocessor(asset), **self.reader_options) as src_dst:
+            with self.reader(
+                asset.path,
+                post_process=rescale_postprocessor(asset),
+                **self.reader_options,
+            ) as src_dst:
                 return src_dst.point(lon, lat, **kwargs)
 
         if "allowed_exceptions" not in kwargs:
@@ -360,7 +385,13 @@ class AsyncMosaicFactory(MosaicTilerFactory):
             headers = {}
             headers["Server-Timing"] = timer.server_timings()
             return JSONResponse(
-                {"assets": [jsonable_encoder(a) for a in assets], "xy_bounds": bbox, "envelope": env, "mosaics": src_path}, headers=headers
+                {
+                    "assets": [jsonable_encoder(a) for a in assets],
+                    "xy_bounds": bbox,
+                    "envelope": env,
+                    "mosaics": src_path,
+                },
+                headers=headers,
             )
 
         @self.router.get(

@@ -10,12 +10,17 @@ from rasterio.rio.overview import get_maximum_overview_level
 import rasterio
 import numpy as N
 import logging
+from os import environ, path
 from .defs import mars_tms, MARS2000_SPHERE
 
 log = logging.getLogger(__name__)
 
 
 EARTH_RADIUS = 6378137
+
+
+def dataset_path(*args):
+    return environ.get("MARS_DATA_DIR", "/mars-data") + path.join(*args)
 
 
 def fake_earth_crs(crs: CRS) -> CRS:

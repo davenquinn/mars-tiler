@@ -17,7 +17,7 @@ import os
 import attr
 from .async_mosaic import AsyncMosaicBackend
 from .defs import mars_tms
-from .util import MarsCOGReader, HiRISEReader, data_to_rgb
+from .util import MarsCOGReader, HiRISEReader, data_to_rgb, dataset_path
 from .database import get_database
 from .timer import Timer
 
@@ -27,7 +27,7 @@ log = get_logger(__name__)
 
 
 def elevation_path():
-    return ["/mars-data/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif"]
+    return dataset_path("/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif")
 
 
 @attr.s

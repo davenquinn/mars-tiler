@@ -13,7 +13,7 @@ from concurrent import futures
 import warnings
 
 from sparrow.utils import get_logger
-from ..util import get_dataset_info
+from ..util import dataset_path, get_dataset_info
 
 log = get_logger()
 
@@ -28,7 +28,7 @@ def get_footprints(dataset_list: Sequence[Path], **kwargs) -> List:
 def ensure_absolute_paths(*paths: Path):
     for path in paths:
         if not path.is_absolute():
-            yield Path("/mars-data") / path
+            yield Path(dataset_path()) / path
         else:
             yield path
 
