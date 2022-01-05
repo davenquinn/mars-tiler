@@ -330,6 +330,9 @@ class AsyncMosaicFactory(MosaicTilerFactory):
             if OptionalHeader.x_assets in self.optional_headers:
                 headers["X-Assets"] = ",".join([d.path for d in data.assets])
 
+            maxzoom = max([d.maxzoom for d in data.assets])
+            headers["X-Max-Zoom"] = str(maxzoom)
+
             return Response(content, media_type=format.mediatype, headers=headers)
 
     def assets(self):
