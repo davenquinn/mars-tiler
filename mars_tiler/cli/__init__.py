@@ -28,13 +28,14 @@ cli.add_typer(mosaic_cli, name="create-mosaic")
 
 def initialize_database(db):
     dn = Path(relative_path(__file__, "../../sql"))
-    for file in dn.glob("*.sql"):
+    for file in sorted(dn.glob("*.sql")):
         db.exec_sql(file)
 
 
 @cli.command(name="create-tables")
 def create_tables():
-    initialize_database()
+    db = get_sync_database()
+    initialize_database(db)
 
 
 images = Typer(no_args_is_help=True)
@@ -172,5 +173,7 @@ def migrate(force: bool = False):
         target_url = _base + "_temp_migration"
         dry_run_url = _base + "_schema_clone"
 
-    migrator = Migrator(db, initialize_database, migrations=[], schema=["imagery"])
+    migrator = Migrator(
+        db, initialize_database, migrations=[], schema=["imagery", "tile_cache"]
+    )
     migrator.run_migration(**kwargs)
