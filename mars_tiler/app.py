@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, Union, List
 import logging
+import os
 
 from fastapi import FastAPI, Query
 from titiler.core.factory import TilerFactory
@@ -10,7 +11,7 @@ from titiler.mosaic.errors import MOSAIC_STATUS_CODES
 from titiler.core.resources.enums import OptionalHeader
 from .database import setup_database, get_sync_database
 from .async_mosaic import AsyncMosaicFactory, get_datasets
-from .util import MarsCOGReader, ElevationReader
+from .util import MarsCOGReader, ElevationReader, dataset_path
 from .mosaic import (
     MarsMosaicBackend,
     ElevationMosaicBackend,
@@ -19,14 +20,14 @@ from .mosaic import (
 )
 
 
-def build_path():
-    return "/mars-data/hirise-images/hirise-red.mosaic.json"
+def build_path(*args):
+    return dataset_path("/hirise-images/hirise-red.mosaic.json")
 
 
 headers = {OptionalHeader.server_timing, OptionalHeader.x_assets}
 
 
-app = FastAPI(title="Mars tile server", root_path="/tiles")
+app = FastAPI(title="Mars tile server")
 
 
 def elevation_mosaic_paths(x: int, y: int, z: int):
@@ -43,47 +44,65 @@ def HiRISEParams(
     image_id: str = Query(..., description="HiRISE image ID"), image_type: str = "RED"
 ) -> str:
     """Create dataset path from args"""
-    return f"/mars-data/hirise-images/{image_id}_{image_type}.tif"
+    return dataset_path(f"/hirise-images/{image_id}_{image_type}.tif")
 
 
 @dataclass
-class HiRISEImageParams(DatasetParams):
-    """Low level WarpedVRT Optional parameters."""
-
-    # nodata: Optional[Union[str, int, float]] = Query(
-    #     0, title="Nodata value", description="Overwrite internal Nodata value"
-    # )
+class ImageryDatasetParams(DatasetParams):
+    resampling_method: ResamplingName = Query(
+        ResamplingName.bilinear,  # type: ignore
+        alias="resampling",
+        description="Resampling method.",
+    )
 
 
 @dataclass
 class HiRISERenderParams(RenderParams):
     rescale: Optional[List[str]] = Query(
-        ["100,1200"],
+        None,
         title="Min/Max data Rescaling",
         description="comma (',') delimited Min,Max bounds. Can set multiple time for multiple bands.",
     )
 
 
-def MosaicParams(mosaic: str = Query(..., description="Mosaic ID")) -> str:
+def SingleMosaicParams(mosaic: str = Query(..., description="Mosaic ID")) -> List[str]:
     """Mosaic ID"""
-    return mosaic
+    return [mosaic]
 
 
-hirise_mosaic = AsyncMosaicFactory(
+def MultiMosaicParams(
+    mosaic: str = Query(
+        "", title="Mosaics", description="comma-delimited mosaics to include"
+    )
+) -> List[str]:
+    if mosaic == "":
+        return []
+    return mosaic.split(",")
+
+
+single_mosaic = AsyncMosaicFactory(
     reader=MarsMosaicBackend,
-    path_dependency=MosaicParams,
+    path_dependency=SingleMosaicParams,
     optional_headers=headers,
-    dataset_dependency=HiRISEImageParams,
+    dataset_dependency=ImageryDatasetParams,
     render_dependency=HiRISERenderParams,
+)
+
+multi_mosaic = AsyncMosaicFactory(
+    reader=MarsMosaicBackend,
+    path_dependency=MultiMosaicParams,
+    optional_headers=headers,
+    dataset_dependency=ImageryDatasetParams,
+    # render_dependency=ImageryRenderParams,
 )
 
 hirise_cog = TilerFactory(
     reader=MarsCOGReader,
     path_dependency=HiRISEParams,
-    dataset_dependency=HiRISEImageParams,
+    dataset_dependency=ImageryDatasetParams,
     render_dependency=HiRISERenderParams,
 )
-app.include_router(hirise_cog.router, tags=["HiRISE images"], prefix="/hirise")
+app.include_router(hirise_cog.router, tags=["Single HiRISE images"], prefix="/hirise")
 
 
 @dataclass
@@ -97,7 +116,7 @@ class ElevationMosaicParams(DatasetParams):
 
 # This is the main dataset
 elevation_mosaic = AsyncMosaicFactory(
-    path_dependency=lambda: "elevation_model",
+    path_dependency=lambda: ["elevation_model"],
     dataset_dependency=ElevationMosaicParams,
     reader=ElevationMosaicBackend,
     optional_headers=headers,
@@ -106,8 +125,10 @@ app.include_router(
     elevation_mosaic.router, tags=["Elevation Mosaic"], prefix="/elevation-mosaic"
 )
 
+app.include_router(multi_mosaic.router, tags=["Multi-Mosaic"], prefix="/mosaic")
+
 app.include_router(
-    hirise_mosaic.router, tags=["Imagery Mosaic"], prefix="/mosaic/{mosaic}"
+    single_mosaic.router, tags=["Imagery Mosaic"], prefix="/mosaic/{mosaic}"
 )
 app.include_router(cog.router, tags=["Global DEM"], prefix="/elevation-global")
 
@@ -118,7 +139,7 @@ async def dataset(mosaic: str, lon: float = None, lat: float = None, zoom: int =
     xy_bounds = mercator_tms.xy_bounds(tile)
     bounds = mercator_tms.bounds(tile)
 
-    datasets = await get_datasets(tile, mosaic)
+    datasets = await get_datasets(tile, [mosaic])
 
     return {
         "mercator_bounds": xy_bounds,

@@ -2,7 +2,7 @@
 
 import os
 from dataclasses import dataclass
-from typing import Dict, Type
+from typing import Dict, Optional
 from json import loads
 
 import rasterio
@@ -14,6 +14,7 @@ from titiler.mosaic.resources.enums import PixelSelectionMethod
 from fastapi import Depends, Path, Query
 from starlette.responses import Response, JSONResponse
 from typing import Any, Dict, List, Tuple, Type
+from fastapi.encoders import jsonable_encoder
 
 import attr
 from morecantile import TileMatrixSet, Tile
@@ -27,24 +28,65 @@ from rio_tiler.tasks import multi_values
 from cogeo_mosaic.errors import NoAssetFoundError
 from sparrow.utils import relative_path, get_logger
 from mercantile import bounds
+from pydantic import BaseModel
+from operator import attrgetter
 
 from .timer import Timer
 from .defs import mars_tms
 from .database import get_database
+from .util import dataset_path
 
 log = get_logger(__name__)
 
+stmt_cache = {}
+
+
+class OverscaledAssetsError(NoAssetFoundError):
+    ...
+
 
 def prepared_statement(id):
-    return open(relative_path(__file__, "sql", f"{id}.sql"), "r").read()
+    cached = stmt_cache.get(id)
+    if cached is None:
+        stmt_cache[id] = open(relative_path(__file__, "sql", f"{id}.sql"), "r").read()
+    return stmt_cache[id]
+
+
+class MosaicAsset(BaseModel):
+    path: str
+    mosaic: Optional[str]
+    rescale_range: Optional[List[float]]
+    minzoom: int
+    maxzoom: int
+
+
+def create_asset(d):
+    row = dict(d)
+    return MosaicAsset(
+        path=get_path(row["path"]),
+        mosaic=str(row["mosaic"]),
+        rescale_range=row.get("rescale_range", None),
+        minzoom=int(row["minzoom"]),
+        maxzoom=int(row["maxzoom"]),
+    )
+
+
+def get_path(d: str):
+    value = str(d)
+    prefix = "/mars-data"
+    if value.startswith(prefix):
+        return dataset_path(str(value[len(prefix) :]))
+    return value
 
 
 async def get_datasets(tile, mosaic):
     if tile.z <= 8 and mosaic == "elevation_model":
         return [
-            "/mars-data/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif"
+            dataset_path("/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif")
         ]
 
+
+async def get_datasets(tile, mosaics: List[str]) -> List[MosaicAsset]:
     bbox = bounds(tile.x, tile.y, tile.z)
 
     # Morecantile is really slow!
@@ -55,17 +97,32 @@ async def get_datasets(tile, mosaic):
     res = await db.fetch_all(
         query=prepared_statement("get-paths"),
         values=dict(
-            mosaic=mosaic,
-            x1=bbox.west,
-            y1=bbox.south,
-            x2=bbox.east,
-            y2=bbox.north,
+            x1=bbox.west, y1=bbox.south, x2=bbox.east, y2=bbox.north, mosaics=mosaics
         ),
     )
     Timer.add_step("findassets")
-    return [
-        str(d._mapping["path"]) for d in res if int(d._mapping["minzoom"]) - 4 < tile.z
-    ]
+
+    assets = [create_asset(d) for d in res if int(d._mapping["minzoom"]) - 5 < tile.z]
+    # and d._mapping.get("mosaic", None) in mosaics]
+
+    if len(mosaics) == 1:
+        return assets
+    # Reorder assets to ensure that mosaics listed first are put on top
+    reordered_assets = assets
+    for mos in mosaics:
+        reordered_assets += [a for a in assets if a.mosaic == mos]
+    return reordered_assets
+
+
+def rescale_postprocessor(asset: MosaicAsset):
+    rng = asset.rescale_range
+
+    def processor(data, mask):
+        if rng is not None:
+            data = ((data - rng[0]) * (1 / (rng[1] - rng[0]) * 255)).astype("uint8")
+        return data, mask
+
+    return processor
 
 
 @attr.s
@@ -84,7 +141,7 @@ class AsyncBaseBackend(AsyncBaseReader):
 
     """
 
-    mosaicid: str = attr.ib()
+    mosaics: List[str] = attr.ib()
 
     reader: Type[BaseReader] = attr.ib(default=COGReader)
     reader_options: Dict = attr.ib(factory=dict)
@@ -102,19 +159,19 @@ class AsyncBaseBackend(AsyncBaseReader):
     )
     crs: CRS = attr.ib(init=False, default=CRS.from_epsg(4326))
 
-    async def assets_for_tile(self, x: int, y: int, z: int) -> List[str]:
+    async def assets_for_tile(self, x: int, y: int, z: int) -> List[MosaicAsset]:
         """Retrieve assets for tile."""
         return await self.get_assets(x, y, z)
 
-    async def assets_for_point(self, lng: float, lat: float) -> List[str]:
+    async def assets_for_point(self, lng: float, lat: float) -> List[MosaicAsset]:
         """Retrieve assets for point."""
         tile = self.tms.tile(lng, lat, self.quadkey_zoom)
         return await self.get_assets(tile.x, tile.y, tile.z)
 
-    async def _get_assets(self, tile: Tile) -> List[str]:
-        return await get_datasets(tile, self.mosaicid)
+    async def _get_assets(self, tile: Tile) -> List[MosaicAsset]:
+        return await get_datasets(tile, self.mosaics)
 
-    async def get_assets(self, x: int, y: int, z: int) -> List[str]:
+    async def get_assets(self, x: int, y: int, z: int) -> List[MosaicAsset]:
         return await self._get_assets(Tile(x, y, z))
 
     async def tile(  # type: ignore
@@ -123,8 +180,9 @@ class AsyncBaseBackend(AsyncBaseReader):
         y: int,
         z: int,
         reverse: bool = False,
+        allow_overscaled: bool = False,
         **kwargs: Any,
-    ) -> Tuple[ImageData, List[str]]:
+    ) -> Tuple[ImageData, List[object]]:
         """Get Tile from multiple observation."""
         mosaic_assets = await self.assets_for_tile(x, y, z)
         if not mosaic_assets:
@@ -133,8 +191,20 @@ class AsyncBaseBackend(AsyncBaseReader):
         if reverse:
             mosaic_assets = list(reversed(mosaic_assets))
 
-        def _reader(asset: str, x: int, y: int, z: int, **kwargs: Any) -> ImageData:
-            with self.reader(asset, **self.reader_options) as src_dst:
+        # If all assets are overscaled, we return nothing.
+        overscaled_assets = [a for a in mosaic_assets if z > a.maxzoom]
+        all_overscaled = len(overscaled_assets) == len(mosaic_assets)
+        if all_overscaled and not allow_overscaled:
+            raise OverscaledAssetsError("All available assets are overscaled")
+
+        def _reader(
+            asset: MosaicAsset, x: int, y: int, z: int, **kwargs: Any
+        ) -> ImageData:
+            with self.reader(
+                asset.path,
+                post_process=rescale_postprocessor(asset),
+                **self.reader_options,
+            ) as src_dst:
                 return src_dst.tile(x, y, z, **kwargs)
 
         data = mosaic_reader(mosaic_assets, _reader, x, y, z, **kwargs)
@@ -156,8 +226,12 @@ class AsyncBaseBackend(AsyncBaseReader):
         if reverse:
             mosaic_assets = list(reversed(mosaic_assets))
 
-        def _reader(asset: str, lon: float, lat: float, **kwargs) -> Dict:
-            with self.reader(asset, **self.reader_options) as src_dst:
+        def _reader(asset: MosaicAsset, lon: float, lat: float, **kwargs) -> Dict:
+            with self.reader(
+                asset.path,
+                post_process=rescale_postprocessor(asset),
+                **self.reader_options,
+            ) as src_dst:
                 return src_dst.point(lon, lat, **kwargs)
 
         if "allowed_exceptions" not in kwargs:
@@ -285,7 +359,10 @@ class AsyncMosaicFactory(MosaicTilerFactory):
                 headers["Server-Timing"] = timer.server_timings()
 
             if OptionalHeader.x_assets in self.optional_headers:
-                headers["X-Assets"] = ",".join(data.assets)
+                headers["X-Assets"] = ",".join([d.path for d in data.assets])
+
+            maxzoom = max([d.maxzoom for d in data.assets])
+            headers["X-Max-Zoom"] = str(maxzoom)
 
             return Response(content, media_type=format.mediatype, headers=headers)
 
@@ -317,7 +394,13 @@ class AsyncMosaicFactory(MosaicTilerFactory):
             headers = {}
             headers["Server-Timing"] = timer.server_timings()
             return JSONResponse(
-                {"assets": assets, "xy_bounds": bbox, "envelope": env}, headers=headers
+                {
+                    "assets": [jsonable_encoder(a) for a in assets],
+                    "xy_bounds": bbox,
+                    "envelope": env,
+                    "mosaics": src_path,
+                },
+                headers=headers,
             )
 
         @self.router.get(
