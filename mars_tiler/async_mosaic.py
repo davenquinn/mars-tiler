@@ -41,7 +41,7 @@ log = get_logger(__name__)
 stmt_cache = {}
 
 
-class OverscaledAssetsError(Exception):
+class OverscaledAssetsError(NoAssetFoundError):
     ...
 
 
