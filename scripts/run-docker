@@ -1,5 +1,20 @@
 #!/usr/bin/env bash -e
 
+# Run API in Docker with VS Code debugging capabilities
 docker build -t mars_tiler .
-docker run --rm -it -p 8000:8000 --env-file .env mars_tiler $@
+docker run \
+  --rm -it \
+  -p 8000:8000 \
+  -p 5678:5678 \
+  --volume $(pwd)/mars_tiler:/code/mars_tiler \
+  --env-file .env \
+  mars_tiler \
+  python \
+    -m debugpy --listen 0.0.0.0:5678 \
+    -m uvicorn \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --reload \
+      mars_tiler:app
+
 

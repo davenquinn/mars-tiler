@@ -40,7 +40,6 @@ ENV CPL_VSIL_CURL_ALLOWED_EXTENSIONS ".tif,.vrt,.cog.tif"
 ENV VSI_CACHE NO
 ENV GDAL_HTTP_VERSION 2
 ENV MARS_TILER_PORT 8000
-ENV MARS_DATA_DIR /mars-data
 
 # Creating folders, and files for a project:
 COPY ./ /code/

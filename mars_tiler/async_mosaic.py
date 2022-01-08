@@ -41,6 +41,10 @@ log = get_logger(__name__)
 stmt_cache = {}
 
 
+class OverscaledAssetsError(NoAssetFoundError):
+    ...
+
+
 def prepared_statement(id):
     cached = stmt_cache.get(id)
     if cached is None:
@@ -98,7 +102,7 @@ async def get_datasets(tile, mosaics: List[str]) -> List[MosaicAsset]:
     )
     Timer.add_step("findassets")
 
-    assets = [create_asset(d) for d in res if int(d._mapping["minzoom"]) - 4 < tile.z]
+    assets = [create_asset(d) for d in res if int(d._mapping["minzoom"]) - 5 < tile.z]
     # and d._mapping.get("mosaic", None) in mosaics]
 
     if len(mosaics) == 1:
@@ -176,6 +180,7 @@ class AsyncBaseBackend(AsyncBaseReader):
         y: int,
         z: int,
         reverse: bool = False,
+        allow_overscaled: bool = False,
         **kwargs: Any,
     ) -> Tuple[ImageData, List[object]]:
         """Get Tile from multiple observation."""
@@ -185,6 +190,12 @@ class AsyncBaseBackend(AsyncBaseReader):
 
         if reverse:
             mosaic_assets = list(reversed(mosaic_assets))
+
+        # If all assets are overscaled, we return nothing.
+        overscaled_assets = [a for a in mosaic_assets if z > a.maxzoom]
+        all_overscaled = len(overscaled_assets) == len(mosaic_assets)
+        if all_overscaled and not allow_overscaled:
+            raise OverscaledAssetsError("All available assets are overscaled")
 
         def _reader(
             asset: MosaicAsset, x: int, y: int, z: int, **kwargs: Any
@@ -349,6 +360,9 @@ class AsyncMosaicFactory(MosaicTilerFactory):
 
             if OptionalHeader.x_assets in self.optional_headers:
                 headers["X-Assets"] = ",".join([d.path for d in data.assets])
+
+            maxzoom = max([d.maxzoom for d in data.assets])
+            headers["X-Max-Zoom"] = str(maxzoom)
 
             return Response(content, media_type=format.mediatype, headers=headers)
 

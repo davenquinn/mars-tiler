@@ -27,7 +27,7 @@ def build_path(*args):
 headers = {OptionalHeader.server_timing, OptionalHeader.x_assets}
 
 
-app = FastAPI(title="Mars tile server", root_path="/tiles")
+app = FastAPI(title="Mars tile server")
 
 
 def elevation_mosaic_paths(x: int, y: int, z: int):
@@ -55,10 +55,11 @@ class ImageryDatasetParams(DatasetParams):
         description="Resampling method.",
     )
 
+
 @dataclass
 class HiRISERenderParams(RenderParams):
     rescale: Optional[List[str]] = Query(
-        ["100,1200"],
+        None,
         title="Min/Max data Rescaling",
         description="comma (',') delimited Min,Max bounds. Can set multiple time for multiple bands.",
     )
@@ -68,7 +69,12 @@ def SingleMosaicParams(mosaic: str = Query(..., description="Mosaic ID")) -> Lis
     """Mosaic ID"""
     return [mosaic]
 
-def MultiMosaicParams(mosaic: str = Query("", title="Mosaics", description="comma-delimited mosaics to include")) -> List[str]:
+
+def MultiMosaicParams(
+    mosaic: str = Query(
+        "", title="Mosaics", description="comma-delimited mosaics to include"
+    )
+) -> List[str]:
     if mosaic == "":
         return []
     return mosaic.split(",")
@@ -87,7 +93,7 @@ multi_mosaic = AsyncMosaicFactory(
     path_dependency=MultiMosaicParams,
     optional_headers=headers,
     dataset_dependency=ImageryDatasetParams,
-    #render_dependency=ImageryRenderParams, 
+    # render_dependency=ImageryRenderParams,
 )
 
 hirise_cog = TilerFactory(
@@ -119,9 +125,7 @@ app.include_router(
     elevation_mosaic.router, tags=["Elevation Mosaic"], prefix="/elevation-mosaic"
 )
 
-app.include_router(
-    multi_mosaic.router, tags=["Multi-Mosaic"], prefix="/mosaic"
-)
+app.include_router(multi_mosaic.router, tags=["Multi-Mosaic"], prefix="/mosaic")
 
 app.include_router(
     single_mosaic.router, tags=["Imagery Mosaic"], prefix="/mosaic/{mosaic}"
