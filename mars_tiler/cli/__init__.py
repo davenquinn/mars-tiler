@@ -40,25 +40,34 @@ def create_tables():
 images = Typer(no_args_is_help=True)
 cli.add_typer(images, name="images")
 
+
 @dataclass
 class CommandContext:
     search: str = None
     mosaic: str = None
+    dtype: str = None
+
     @property
     def datasets(self):
-        return get_datasets(search_string=self.search, mosaic=[self.mosaic])
+        return get_datasets(
+            search_string=self.search, mosaic=self.mosaic, dtype=self.dtype
+        )
 
 
 @images.callback()
-def images_main(ctx: Context, search: str = None, mosaic: str = None):
+def images_main(
+    ctx: Context, search: str = None, mosaic: str = None, dtype: str = None
+):
     """
     Manage images.
     """
-    ctx.obj = CommandContext(search, mosaic)
+    ctx.obj = CommandContext(search, mosaic, dtype)
+
 
 def get_json_info(dataset: Path):
     output = cmd("gdalinfo -json -approx_stats", str(dataset), capture_output=True)
     return loads(output.stdout)
+
 
 def _update_info(datasets, mosaic=None):
     db = get_sync_database()
@@ -91,7 +100,7 @@ def add_footprints(datasets: List[Path], mosaic: Optional[str] = None):
     _update_info(datasets, mosaic)
 
 
-def get_datasets(*, search_string: str = None, mosaic=None):
+def get_datasets(*, search_string: str = None, mosaic=None, dtype=None):
     db = get_sync_database()
     Dataset = db.model.imagery_dataset
     datasets = db.session.query(Dataset)
@@ -99,7 +108,9 @@ def get_datasets(*, search_string: str = None, mosaic=None):
         datasets = datasets.filter(Dataset.mosaic == mosaic)
     if search_string is not None:
         datasets = datasets.filter(Dataset.name.contains(search_string))
-    return (Path(d.path) for d in datasets)
+    if dtype is not None:
+        datasets = datasets.filter(Dataset.dtype == dtype)
+    return [Path(d.path) for d in datasets]
 
 
 @images.command(name="update")
@@ -114,11 +125,13 @@ def get_info(ctx: Context, full: bool = False):
     for dataset in obj.datasets:
         with rasterio.open(dataset) as ds:
             print(str(dataset.name))
-            print(ds.nodata)
+            print("  ".join(ds.dtypes))
+            print("  ".join([str(s) for s in ds.nodatavals]))
             print(f"[dim]{ds.crs}")
             if full:
                 print(get_json_info(dataset))
             print()
+
 
 @images.command(name="paths")
 def paths(ctx: Context, full: bool = False):
@@ -136,18 +149,14 @@ def paths(ctx: Context, full: bool = False):
 
 @images.command(name="add-nodata")
 def add_nodata(ctx: Context, value: int):
-    ctx.find_object(CommandContext)
-    for dataset in ctx.datasets:
+    obj = ctx.find_object(CommandContext)
+    for dataset in obj.datasets:
         with rasterio.open(dataset, "r+") as ds:
             print(str(dataset.name))
             if ds.nodata is not None:
                 print("[dim]Nodata value already set")
                 continue
             ds.nodata = value
-
-
-
-
 
 
 @cli.command(name="migrate")
