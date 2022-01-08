@@ -59,7 +59,7 @@ class ImageryDatasetParams(DatasetParams):
 @dataclass
 class HiRISERenderParams(RenderParams):
     rescale: Optional[List[str]] = Query(
-        ["100,1200"],
+        None,
         title="Min/Max data Rescaling",
         description="comma (',') delimited Min,Max bounds. Can set multiple time for multiple bands.",
     )
