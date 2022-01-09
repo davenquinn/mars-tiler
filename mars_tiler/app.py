@@ -5,7 +5,7 @@ import os
 
 from fastapi import FastAPI, Query
 from titiler.core.factory import TilerFactory
-from titiler.core.dependencies import DatasetParams, RenderParams, ResamplingName
+from titiler.core.dependencies import DatasetParams, PostProcessParams, ResamplingName
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 from titiler.mosaic.errors import MOSAIC_STATUS_CODES
 from titiler.core.resources.enums import OptionalHeader
@@ -57,12 +57,8 @@ class ImageryDatasetParams(DatasetParams):
 
 
 @dataclass
-class HiRISERenderParams(RenderParams):
-    rescale: Optional[List[str]] = Query(
-        None,
-        title="Min/Max data Rescaling",
-        description="comma (',') delimited Min,Max bounds. Can set multiple time for multiple bands.",
-    )
+class MosaicRenderParams(PostProcessParams):
+    ...
 
 
 def SingleMosaicParams(mosaic: str = Query(..., description="Mosaic ID")) -> List[str]:
@@ -85,22 +81,21 @@ single_mosaic = AsyncMosaicFactory(
     path_dependency=SingleMosaicParams,
     optional_headers=headers,
     dataset_dependency=ImageryDatasetParams,
-    render_dependency=HiRISERenderParams,
+    process_dependency=MosaicRenderParams,
 )
 
 multi_mosaic = AsyncMosaicFactory(
     reader=MarsMosaicBackend,
     path_dependency=MultiMosaicParams,
     optional_headers=headers,
-    dataset_dependency=ImageryDatasetParams,
-    # render_dependency=ImageryRenderParams,
+    process_dependency=ImageryDatasetParams,
 )
 
 hirise_cog = TilerFactory(
     reader=MarsCOGReader,
     path_dependency=HiRISEParams,
     dataset_dependency=ImageryDatasetParams,
-    render_dependency=HiRISERenderParams,
+    process_dependency=MosaicRenderParams,
 )
 app.include_router(hirise_cog.router, tags=["Single HiRISE images"], prefix="/hirise")
 

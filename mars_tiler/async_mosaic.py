@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 from json import loads
 
-import rasterio
 from rio_tiler.constants import MAX_THREADS
 from titiler.mosaic.factory import MosaicTilerFactory
 from titiler.core.factory import img_endpoint_params
@@ -300,12 +299,11 @@ class AsyncMosaicFactory(MosaicTilerFactory):
             src_path=Depends(self.path_dependency),
             layer_params=Depends(self.layer_dependency),
             dataset_params=Depends(self.dataset_dependency),
-            render_params=Depends(self.render_dependency),
+            render_params=Depends(self.process_dependency),
             colormap=Depends(self.colormap_dependency),
             pixel_selection: PixelSelectionMethod = Query(
                 PixelSelectionMethod.first, description="Pixel selection method."
             ),
-            kwargs: Dict = Depends(self.additional_dependency),
         ):
             """Create map tile from a COG."""
             headers: Dict[str, str] = {}

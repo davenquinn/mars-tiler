@@ -1,5 +1,7 @@
 all: test
 
+.PHONY: install test run run-docker
+
 install:
 	poetry install
 	poetry run pip install -r poetry-overrides.txt

@@ -4,7 +4,7 @@ set -o allexport
 source .env
 set +o allexport
 
-poetry run tile-server \
+poetry run \ 
   gunicorn mars_tiler:app \
     --bind 0.0.0.0:$MARS_TILER_PORT \
     --workers 8 \
