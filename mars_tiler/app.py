@@ -16,7 +16,6 @@ from .mosaic import (
     MarsMosaicBackend,
     ElevationMosaicBackend,
     mercator_tms,
-    elevation_path,
 )
 
 
@@ -33,11 +32,6 @@ app = FastAPI(title="Mars tile server")
 def elevation_mosaic_paths(x: int, y: int, z: int):
     # tile = Tile(x, y, z)
     return None
-
-
-cog = TilerFactory(
-    path_dependency=elevation_path, reader=ElevationReader, optional_headers=headers
-)
 
 
 def HiRISEParams(
@@ -125,16 +119,15 @@ app.include_router(multi_mosaic.router, tags=["Multi-Mosaic"], prefix="/mosaic")
 app.include_router(
     single_mosaic.router, tags=["Imagery Mosaic"], prefix="/mosaic/{mosaic}"
 )
-app.include_router(cog.router, tags=["Global DEM"], prefix="/elevation-global")
 
 
 @app.get("/datasets/{mosaic}")
-async def dataset(mosaic: str, lon: float = None, lat: float = None, zoom: int = 4):
+def dataset(mosaic: str, lon: float = None, lat: float = None, zoom: int = 4):
     tile = mercator_tms.tile(lon, lat, zoom)
     xy_bounds = mercator_tms.xy_bounds(tile)
     bounds = mercator_tms.bounds(tile)
 
-    datasets = await get_datasets(tile, [mosaic])
+    datasets = get_datasets(tile, [mosaic])
 
     return {
         "mercator_bounds": xy_bounds,

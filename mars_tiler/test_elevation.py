@@ -34,7 +34,7 @@ class MarsTestMosaicBackend(MarsMosaicBackend):
         self.datasets = datasets
         super().__init__(self, None, *args, **kwargs)
 
-    async def _get_assets(self, tile: Tile) -> List[MosaicAsset]:
+    def _get_assets(self, tile: Tile) -> List[MosaicAsset]:
         tile_feature = _tile_geom(tile)
         return [
             MosaicAsset(
@@ -66,16 +66,14 @@ def elevation_backend(elevation_models):
 @mark.anyio
 async def test_basic_tiler(mosaic_backend):
     test_tile = positions[0].tile
-    tile_data, assets = await mosaic_backend.tile(test_tile.x, test_tile.y, test_tile.z)
+    tile_data, assets = mosaic_backend.tile(test_tile.x, test_tile.y, test_tile.z)
     assert tile_data.data.shape == (1, 256, 256)
 
 
 @mark.anyio
 async def test_elevation_tiler(elevation_backend):
     test_tile = positions[0].tile
-    tile_data, assets = await elevation_backend.tile(
-        test_tile.x, test_tile.y, test_tile.z
-    )
+    tile_data, assets = elevation_backend.tile(test_tile.x, test_tile.y, test_tile.z)
     assert len(assets) == 2
     assert isinstance(tile_data, ImageData)
     assert tile_data.data.shape == (3, 256, 256)

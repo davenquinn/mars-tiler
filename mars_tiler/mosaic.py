@@ -17,7 +17,7 @@ import os
 import attr
 
 from mars_tiler.defs.crs import MARS2000_SPHERE
-from .async_mosaic import AsyncMosaicBackend
+from .async_mosaic import PGMosaicBackend
 from .defs import mars_tms, MARS2000, MARS_MERCATOR, MARS2000_SPHERE
 from .util import MarsCOGReader, HiRISEReader, data_to_rgb, dataset_path
 from .database import get_database
@@ -28,12 +28,8 @@ mercator_tms = tms.get("WebMercatorQuad")
 log = get_logger(__name__)
 
 
-def elevation_path():
-    return dataset_path("/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif")
-
-
 @attr.s
-class MarsMosaicBackend(AsyncMosaicBackend):
+class MarsMosaicBackend(PGMosaicBackend):
     def __attrs_post_init__(self):
         self.geographic_crs = MARS2000_SPHERE
         self.crs = MARS_MERCATOR
@@ -43,8 +39,8 @@ class MarsMosaicBackend(AsyncMosaicBackend):
 
 @attr.s
 class ElevationMosaicBackend(MarsMosaicBackend):
-    async def tile(self, *args, **kwargs):
-        im, assets = await super().tile(*args, **kwargs)
+    def tile(self, *args, **kwargs):
+        im, assets = super().tile(*args, **kwargs)
         im.data = data_to_rgb(im.data[0], -10000, 0.1)
         Timer.add_step("rgbencode")
         return (im, assets)
