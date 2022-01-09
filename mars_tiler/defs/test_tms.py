@@ -14,6 +14,7 @@ class PositionTest(BaseModel):
 positions = [
     PositionTest(lon=149.936, lat=-3.752, tile=Tile(7507, 4181, 13)),
     PositionTest(lon=20, lat=-80, tile=Tile(18204, 29089, 15)),
+    PositionTest(lon=149.9, lat=-3.8, tile=Tile(3753, 2091, 12)),
 ]
 
 

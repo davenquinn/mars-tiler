@@ -5,15 +5,15 @@ from morecantile import Tile
 from pydantic import BaseModel
 from pytest import mark, fixture
 from rio_tiler.models import ImageData
-from rio_rgbify.encoders import data_to_rgb
 from shapely.geometry import Polygon
 
 from .defs.test_tms import positions
 from .mosaic import MarsMosaicBackend, ElevationMosaicBackend
 from ._test_utils import dataset_footprint, fixtures, _tile_geom
+from .async_mosaic import MosaicAsset
 
 
-class Dataset(BaseModel):
+class DatasetTestData(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
@@ -24,20 +24,28 @@ class Dataset(BaseModel):
 @fixture(scope="module")
 def elevation_models():
     paths = (fixtures.resolve() / "elevation-models").glob("*.tif")
-    return [Dataset(path=d, footprint=dataset_footprint(d)) for d in paths]
+    return [DatasetTestData(path=d, footprint=dataset_footprint(d)) for d in paths]
 
 
 class MarsTestMosaicBackend(MarsMosaicBackend):
-    datasets: List[Dataset]
+    datasets: List[DatasetTestData]
 
     def __init__(self, datasets, *args, **kwargs):
         self.datasets = datasets
         super().__init__(self, None, *args, **kwargs)
 
-    async def _get_assets(self, tile: Tile) -> List[str]:
+    async def _get_assets(self, tile: Tile) -> List[MosaicAsset]:
         tile_feature = _tile_geom(tile)
         return [
-            str(d.path) for d in self.datasets if tile_feature.intersects(d.footprint)
+            MosaicAsset(
+                path=str(d.path),
+                mosaic="elevation",
+                rescale_range=None,
+                minzoom=0,
+                maxzoom=18,
+            )
+            for d in self.datasets
+            if tile_feature.intersects(d.footprint)
         ]
 
 

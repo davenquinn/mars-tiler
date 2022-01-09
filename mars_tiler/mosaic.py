@@ -15,8 +15,10 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 
 import attr
+
+from mars_tiler.defs.crs import MARS2000_SPHERE
 from .async_mosaic import AsyncMosaicBackend
-from .defs import mars_tms
+from .defs import mars_tms, MARS2000, MARS_MERCATOR, MARS2000_SPHERE
 from .util import MarsCOGReader, HiRISEReader, data_to_rgb, dataset_path
 from .database import get_database
 from .timer import Timer
@@ -33,6 +35,9 @@ def elevation_path():
 @attr.s
 class MarsMosaicBackend(AsyncMosaicBackend):
     def __attrs_post_init__(self):
+        self.geographic_crs = MARS2000_SPHERE
+        self.crs = MARS_MERCATOR
+        self.tms = mars_tms
         self.reader = MarsCOGReader
 
 

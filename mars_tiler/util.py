@@ -1,9 +1,11 @@
 from typing import Dict, Tuple
 from rio_tiler.io import COGReader
+import attr
 import warnings
 from rio_tiler.errors import NoOverviewWarning
 from rasterio.vrt import WarpedVRT
 from rasterio.crs import CRS
+from morecantile import TileMatrixSet
 from rio_rgbify.encoders import data_to_rgb
 from rasterio.warp import calculate_default_transform, transform_bounds
 from rasterio.rio.overview import get_maximum_overview_level
@@ -11,7 +13,8 @@ import rasterio
 import numpy as N
 import logging
 from os import environ, path
-from .defs import mars_tms, MARS2000_SPHERE
+from .defs import mars_tms
+from .defs.crs import MARS2000_SPHERE, MARS_MERCATOR, MARS2000
 
 log = logging.getLogger(__name__)
 
@@ -87,7 +90,6 @@ def get_cog_info(src_path: str, cog: COGReader):
 
 
 class MarsCOGReader(COGReader):
-    tms = mars_tms
     # Note: we can probably get rid of this with rio-tiler v3
     def __attrs_post_init__(self):
         """Define _kwargs, open dataset and get info."""
@@ -103,14 +105,16 @@ class MarsCOGReader(COGReader):
             self._kwargs["post_process"] = self.post_process
 
         self.tms = mars_tms
-        self.dataset = self.dataset or rasterio.open(self.filepath)
+        self.geographic_crs = MARS2000
 
+        self.dataset = self.dataset or rasterio.open(self.input)
         self.nodata = self.nodata if self.nodata is not None else self.dataset.nodata
 
-        # self.bounds = self.dataset.bounds
         self.bounds = transform_bounds(
-            self.dataset.crs, MARS2000_SPHERE, *self.dataset.bounds, densify_pts=21
+            self.dataset.crs, self.geographic_crs, *self.dataset.bounds, densify_pts=21
         )
+        self.crs = self.dataset.crs
+
         if self.minzoom is None or self.maxzoom is None:
             self._set_zooms()
 

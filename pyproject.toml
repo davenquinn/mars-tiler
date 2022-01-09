@@ -31,6 +31,7 @@ debugpy = "^1.5.1"
 "sparrow.dinosaur" = {path = "./deps/python-tools/dinosaur", develop = true}
 "sparrow.utils" = {path = "./deps/python-tools/utils", develop = true}
 trio = "^0.19.0"
+black = {version = "^21.12b0", allow-prereleases = true}
 
 [tool.poetry.scripts]
 tile-server = "mars_tiler:cli"
