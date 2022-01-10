@@ -1,20 +1,14 @@
-from typing import Dict, Tuple
+from typing import Dict
 from rio_tiler.io import COGReader
-import attr
-import warnings
-from rio_tiler.errors import NoOverviewWarning
 from rasterio.vrt import WarpedVRT
 from rasterio.crs import CRS
-from morecantile import TileMatrixSet
 from rio_rgbify.encoders import data_to_rgb
-from rasterio.warp import calculate_default_transform, transform_bounds
-from rasterio.rio.overview import get_maximum_overview_level
+from rasterio.warp import transform_bounds
 import rasterio
-import numpy as N
 import logging
 from os import environ, path
 from .defs import mars_tms
-from .defs.crs import MARS2000_SPHERE, MARS_MERCATOR, MARS2000
+from .defs.crs import MARS2000
 
 log = logging.getLogger(__name__)
 
