@@ -9,4 +9,6 @@ mars_tms = TileMatrixSet.custom(
     extent_crs=MARS2000_SPHERE,
     title="Web Mercator Mars",
     geographic_crs=MARS2000_SPHERE,
+    minzoom=0,
+    maxzoom=24,
 )

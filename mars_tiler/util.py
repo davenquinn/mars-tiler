@@ -62,9 +62,9 @@ class FakeEarthCOGReader(COGReader):
         super().close()
 
 
-def get_cog_info(src_path: str, cog: COGReader):
-    bounds = cog.bounds
-    print(bounds)
+def get_cog_info(src_path: str, cog: COGReader, crs=MARS2000) -> Dict:
+    bounds = transform_bounds(cog.crs, crs, *cog.bounds, densify_pts=21)
+
     return {
         "geometry": {
             "type": "Polygon",
@@ -110,9 +110,7 @@ class MarsCOGReader(COGReader):
         self.dataset = self.dataset or rasterio.open(self.input)
         self.nodata = self.nodata if self.nodata is not None else self.dataset.nodata
 
-        self.bounds = transform_bounds(
-            self.dataset.crs, self.geographic_crs, *self.dataset.bounds, densify_pts=21
-        )
+        self.bounds = self.dataset.bounds
         self.crs = self.dataset.crs
 
         if self.minzoom is None or self.maxzoom is None:
