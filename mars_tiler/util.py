@@ -44,6 +44,9 @@ class FakeEarthCOGReader(COGReader):
     """Hopefully temporary kludge to get around the Proj library's recent insistence that
     all the good web-mapping projections are for Earth only. Opens a dataset in a
     mode that substitutes a Mars-like radius for WGS84.
+
+    v0.2: We no longer need this due to enhancements in the Morecantile library,
+    but we're keeping it around for testing purposes.
     """
 
     def __init__(self, src_path, dataset=None, *args, **kwargs):
@@ -90,42 +93,11 @@ def get_cog_info(src_path: str, cog: COGReader, crs=MARS2000) -> Dict:
 
 
 class MarsCOGReader(COGReader):
-    # Note: we can probably get rid of this with rio-tiler v3
+    # There is probably a better way to do this...
     def __attrs_post_init__(self):
-        """Define _kwargs, open dataset and get info."""
-        if self.nodata is not None:
-            self._kwargs["nodata"] = self.nodata
-        if self.unscale is not None:
-            self._kwargs["unscale"] = self.unscale
-        if self.resampling_method is not None:
-            self._kwargs["resampling_method"] = self.resampling_method
-        if self.vrt_options is not None:
-            self._kwargs["vrt_options"] = self.vrt_options
-        if self.post_process is not None:
-            self._kwargs["post_process"] = self.post_process
-
         self.tms = mars_tms
         self.geographic_crs = MARS2000
-
-        self.dataset = self.dataset or rasterio.open(self.input)
-        self.nodata = self.nodata if self.nodata is not None else self.dataset.nodata
-
-        self.bounds = self.dataset.bounds
-        self.crs = self.dataset.crs
-
-        if self.minzoom is None or self.maxzoom is None:
-            self._set_zooms()
-
-        if self.colormap is None:
-            self._get_colormap()
-
-        if min(
-            self.dataset.width, self.dataset.height
-        ) > 512 and not self.dataset.overviews(1):
-            warnings.warn(
-                "The dataset has no Overviews. rio-tiler performances might be impacted.",
-                NoOverviewWarning,
-            )
+        super().__attrs_post_init__()
 
 
 def post_process(elevation, mask):
