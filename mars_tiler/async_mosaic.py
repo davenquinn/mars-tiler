@@ -83,7 +83,7 @@ def get_datasets(tile, mosaics: List[str]) -> List[MosaicAsset]:
     Timer.add_step("tilebounds")
     db = get_sync_database()
     Timer.add_step("dbconnect")
-    res = db.run_query(
+    res = db.session.execute(
         prepared_statement("get-paths"),
         dict(x1=bbox.west, y1=bbox.south, x2=bbox.east, y2=bbox.north, mosaics=mosaics),
     )
@@ -144,9 +144,19 @@ class PGMosaicBackend(BaseReader):
     )
     crs: CRS = attr.ib(init=False, default=CRS.from_epsg(4326))
 
-    def assets_for_tile(self, x: int, y: int, z: int) -> List[MosaicAsset]:
+    def assets_for_tile(
+        self, x: int, y: int, z: int, allow_overscaled=False
+    ) -> List[MosaicAsset]:
         """Retrieve assets for tile."""
-        return self.get_assets(x, y, z)
+        mosaic_assets = self.get_assets(x, y, z)
+
+        # If all assets are overscaled, we return nothing.
+        overscaled_assets = [a for a in mosaic_assets if z > a.maxzoom]
+        all_overscaled = len(overscaled_assets) == len(mosaic_assets)
+        if all_overscaled and not allow_overscaled:
+            raise OverscaledAssetsError("All available assets are overscaled")
+
+        return mosaic_assets
 
     def assets_for_point(self, lng: float, lat: float) -> List[MosaicAsset]:
         """Retrieve assets for point."""
@@ -154,7 +164,7 @@ class PGMosaicBackend(BaseReader):
         return self.get_assets(tile.x, tile.y, tile.z)
 
     def _get_assets(self, tile: Tile) -> List[MosaicAsset]:
-        return get_datasets(tile, self.mosaics)
+        return get_datasets(tile, self.input)
 
     def get_assets(self, x: int, y: int, z: int) -> List[MosaicAsset]:
         return self._get_assets(Tile(x, y, z))
@@ -175,12 +185,6 @@ class PGMosaicBackend(BaseReader):
 
         if reverse:
             mosaic_assets = list(reversed(mosaic_assets))
-
-        # If all assets are overscaled, we return nothing.
-        overscaled_assets = [a for a in mosaic_assets if z > a.maxzoom]
-        all_overscaled = len(overscaled_assets) == len(mosaic_assets)
-        if all_overscaled and not allow_overscaled:
-            raise OverscaledAssetsError("All available assets are overscaled")
 
         def _reader(
             asset: MosaicAsset, x: int, y: int, z: int, **kwargs: Any
@@ -281,11 +285,12 @@ class AsyncMosaicFactory(MosaicTilerFactory):
             src_path=Depends(self.path_dependency),
             layer_params=Depends(self.layer_dependency),
             dataset_params=Depends(self.dataset_dependency),
-            render_params=Depends(self.process_dependency),
-            colormap=Depends(self.colormap_dependency),
             pixel_selection: PixelSelectionMethod = Query(
                 PixelSelectionMethod.first, description="Pixel selection method."
             ),
+            postprocess_params=Depends(self.process_dependency),
+            colormap=Depends(self.colormap_dependency),
+            render_params=Depends(self.render_dependency),
         ):
             """Create map tile from a COG."""
             headers: Dict[str, str] = {}
@@ -299,11 +304,9 @@ class AsyncMosaicFactory(MosaicTilerFactory):
                 with self.reader(
                     src_path,
                     reader=self.dataset_reader,
-                    reader_options=self.reader_options,
                     **self.backend_options,
                 ) as src_dst:
                     t.add_step("mosaicread")
-
                     data, _ = src_dst.tile(
                         x,
                         y,
@@ -311,26 +314,22 @@ class AsyncMosaicFactory(MosaicTilerFactory):
                         pixel_selection=pixel_selection.method(),
                         tilesize=tilesize,
                         threads=threads,
-                        **layer_params.kwargs,
-                        **dataset_params.kwargs,
+                        **layer_params,
+                        **dataset_params,
                     )
                 # timings.append(("dataread", round((t.elapsed - mosaic_read) * 1000, 2)))
 
                 if not format:
                     format = ImageType.jpeg if data.mask.all() else ImageType.png
 
-                image = data.post_process(
-                    in_range=render_params.rescale_range,
-                    color_formula=render_params.color_formula,
-                )
+                image = data.post_process(**postprocess_params)
                 t.add_step("postprocess")
 
                 content = image.render(
-                    add_mask=render_params.return_mask,
                     img_format=format.driver,
                     colormap=colormap,
                     **format.profile,
-                    **render_params.kwargs,
+                    **render_params,
                 )
                 t.add_step("format")
 
@@ -387,7 +386,7 @@ class AsyncMosaicFactory(MosaicTilerFactory):
         )
         def assets(mosaic=Depends(self.path_dependency)):
             db = get_sync_database()
-            data = db.run_query(
+            data = db.session.execute(
                 prepared_statement("get-datasets"),
                 dict(
                     mosaic=mosaic,

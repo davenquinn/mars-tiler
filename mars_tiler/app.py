@@ -148,6 +148,11 @@ add_exception_handlers(app, DEFAULT_STATUS_CODES)
 add_exception_handlers(app, MOSAIC_STATUS_CODES)
 
 
+@app.get("/healthcheck")
+def healthcheck():
+    return {"status": "ok"}
+
+
 @app.on_event("startup")
 async def startup_event():
     await setup_database()
