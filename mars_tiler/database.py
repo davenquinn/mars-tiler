@@ -1,6 +1,7 @@
 from os import environ
 from databases import Database
 from sparrow.birdbrain import Database as SyncDatabase
+from sparrow.utils import relative_path
 
 db = None
 
@@ -39,3 +40,13 @@ async def get_database():
     if database is None:
         return await setup_database()
     return database
+
+
+stmt_cache = {}
+
+
+def prepared_statement(id):
+    cached = stmt_cache.get(id)
+    if cached is None:
+        stmt_cache[id] = open(relative_path(__file__, "sql", f"{id}.sql"), "r").read()
+    return stmt_cache[id]

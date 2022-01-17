@@ -10,7 +10,7 @@ from shapely.geometry import Polygon
 from .defs.test_tms import positions
 from .mosaic import MarsMosaicBackend, ElevationMosaicBackend
 from ._test_utils import dataset_footprint, fixtures, _tile_geom
-from .async_mosaic import MosaicAsset
+from .mosaic.base import MosaicAsset
 
 
 class DatasetTestData(BaseModel):
@@ -34,8 +34,8 @@ class MarsTestMosaicBackend(MarsMosaicBackend):
         self.datasets = datasets
         super().__init__(self, None, *args, **kwargs)
 
-    def _get_assets(self, tile: Tile) -> List[MosaicAsset]:
-        tile_feature = _tile_geom(tile)
+    def get_assets(self, x: int, y: int, z: int) -> List[MosaicAsset]:
+        tile_feature = _tile_geom(Tile(x, y, z))
         return [
             MosaicAsset(
                 path=str(d.path),

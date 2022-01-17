@@ -10,8 +10,8 @@ from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 from titiler.mosaic.errors import MOSAIC_STATUS_CODES
 from titiler.core.resources.enums import OptionalHeader
 from .database import setup_database, get_sync_database
-from .async_mosaic import AsyncMosaicFactory, get_datasets
-from .util import MarsCOGReader, ElevationReader, dataset_path
+from .routes import MosaicRouteFactory, get_datasets
+from .util import MarsCOGReader, dataset_path
 from .mosaic import (
     MarsMosaicBackend,
     ElevationMosaicBackend,
@@ -70,7 +70,7 @@ def MultiMosaicParams(
     return mosaic.split(",")
 
 
-single_mosaic = AsyncMosaicFactory(
+single_mosaic = MosaicRouteFactory(
     reader=MarsMosaicBackend,
     path_dependency=SingleMosaicParams,
     optional_headers=headers,
@@ -78,7 +78,7 @@ single_mosaic = AsyncMosaicFactory(
     process_dependency=MosaicRenderParams,
 )
 
-multi_mosaic = AsyncMosaicFactory(
+multi_mosaic = MosaicRouteFactory(
     reader=MarsMosaicBackend,
     path_dependency=MultiMosaicParams,
     optional_headers=headers,
@@ -104,7 +104,7 @@ class ElevationMosaicParams(DatasetParams):
 
 
 # This is the main dataset
-elevation_mosaic = AsyncMosaicFactory(
+elevation_mosaic = MosaicRouteFactory(
     path_dependency=lambda: ["elevation_model"],
     dataset_dependency=ElevationMosaicParams,
     reader=ElevationMosaicBackend,
