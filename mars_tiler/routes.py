@@ -19,7 +19,7 @@ from sparrow.utils import get_logger
 from .timer import Timer
 from .defs import mars_tms
 from .database import get_sync_database, prepared_statement
-from .mosaic.base import PGMosaicBackend, get_datasets
+from .mosaic.base import PGMosaicBackend
 
 
 log = get_logger(__name__)

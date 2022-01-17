@@ -1,7 +1,6 @@
 from dataclasses import dataclass
-from typing import Optional, Union, List
+from typing import List
 import logging
-import os
 
 from fastapi import FastAPI, Query
 from titiler.core.factory import TilerFactory
