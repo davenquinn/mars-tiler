@@ -1,17 +1,14 @@
-from typing import Dict, Tuple
+from typing import Dict
 from rio_tiler.io import COGReader
-import warnings
-from rio_tiler.errors import NoOverviewWarning
 from rasterio.vrt import WarpedVRT
 from rasterio.crs import CRS
 from rio_rgbify.encoders import data_to_rgb
-from rasterio.warp import calculate_default_transform, transform_bounds
-from rasterio.rio.overview import get_maximum_overview_level
+from rasterio.warp import transform_bounds
 import rasterio
-import numpy as N
 import logging
 from os import environ, path
-from .defs import mars_tms, MARS2000_SPHERE
+from .defs import mars_tms
+from .defs.crs import MARS2000
 
 log = logging.getLogger(__name__)
 
@@ -41,6 +38,9 @@ class FakeEarthCOGReader(COGReader):
     """Hopefully temporary kludge to get around the Proj library's recent insistence that
     all the good web-mapping projections are for Earth only. Opens a dataset in a
     mode that substitutes a Mars-like radius for WGS84.
+
+    v0.2: We no longer need this due to enhancements in the Morecantile library,
+    but we're keeping it around for testing purposes.
     """
 
     def __init__(self, src_path, dataset=None, *args, **kwargs):
@@ -59,9 +59,9 @@ class FakeEarthCOGReader(COGReader):
         super().close()
 
 
-def get_cog_info(src_path: str, cog: COGReader):
-    bounds = cog.bounds
-    print(bounds)
+def get_cog_info(src_path: str, cog: COGReader, crs=MARS2000) -> Dict:
+    bounds = transform_bounds(cog.crs, crs, *cog.bounds, densify_pts=21)
+
     return {
         "geometry": {
             "type": "Polygon",
@@ -87,43 +87,11 @@ def get_cog_info(src_path: str, cog: COGReader):
 
 
 class MarsCOGReader(COGReader):
-    tms = mars_tms
-    # Note: we can probably get rid of this with rio-tiler v3
+    # There is probably a better way to do this...
     def __attrs_post_init__(self):
-        """Define _kwargs, open dataset and get info."""
-        if self.nodata is not None:
-            self._kwargs["nodata"] = self.nodata
-        if self.unscale is not None:
-            self._kwargs["unscale"] = self.unscale
-        if self.resampling_method is not None:
-            self._kwargs["resampling_method"] = self.resampling_method
-        if self.vrt_options is not None:
-            self._kwargs["vrt_options"] = self.vrt_options
-        if self.post_process is not None:
-            self._kwargs["post_process"] = self.post_process
-
         self.tms = mars_tms
-        self.dataset = self.dataset or rasterio.open(self.filepath)
-
-        self.nodata = self.nodata if self.nodata is not None else self.dataset.nodata
-
-        # self.bounds = self.dataset.bounds
-        self.bounds = transform_bounds(
-            self.dataset.crs, MARS2000_SPHERE, *self.dataset.bounds, densify_pts=21
-        )
-        if self.minzoom is None or self.maxzoom is None:
-            self._set_zooms()
-
-        if self.colormap is None:
-            self._get_colormap()
-
-        if min(
-            self.dataset.width, self.dataset.height
-        ) > 512 and not self.dataset.overviews(1):
-            warnings.warn(
-                "The dataset has no Overviews. rio-tiler performances might be impacted.",
-                NoOverviewWarning,
-            )
+        self.geographic_crs = MARS2000
+        super().__attrs_post_init__()
 
 
 def post_process(elevation, mask):

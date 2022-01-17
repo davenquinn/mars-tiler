@@ -1,7 +1,3 @@
-# 150.5314881731248 -0.211133510973705
-
-from sparrow.utils import relative_path
-from pathlib import Path
 from pytest import fixture, raises
 from shapely.geometry import Point, shape
 from rio_tiler.errors import TileOutsideBounds

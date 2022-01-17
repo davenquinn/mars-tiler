@@ -5,15 +5,15 @@ from morecantile import Tile
 from pydantic import BaseModel
 from pytest import mark, fixture
 from rio_tiler.models import ImageData
-from rio_rgbify.encoders import data_to_rgb
 from shapely.geometry import Polygon
 
 from .defs.test_tms import positions
 from .mosaic import MarsMosaicBackend, ElevationMosaicBackend
 from ._test_utils import dataset_footprint, fixtures, _tile_geom
+from .mosaic.base import MosaicAsset
 
 
-class Dataset(BaseModel):
+class DatasetTestData(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
@@ -24,20 +24,28 @@ class Dataset(BaseModel):
 @fixture(scope="module")
 def elevation_models():
     paths = (fixtures.resolve() / "elevation-models").glob("*.tif")
-    return [Dataset(path=d, footprint=dataset_footprint(d)) for d in paths]
+    return [DatasetTestData(path=d, footprint=dataset_footprint(d)) for d in paths]
 
 
 class MarsTestMosaicBackend(MarsMosaicBackend):
-    datasets: List[Dataset]
+    datasets: List[DatasetTestData]
 
     def __init__(self, datasets, *args, **kwargs):
         self.datasets = datasets
         super().__init__(self, None, *args, **kwargs)
 
-    async def _get_assets(self, tile: Tile) -> List[str]:
-        tile_feature = _tile_geom(tile)
+    def get_assets(self, x: int, y: int, z: int) -> List[MosaicAsset]:
+        tile_feature = _tile_geom(Tile(x, y, z))
         return [
-            str(d.path) for d in self.datasets if tile_feature.intersects(d.footprint)
+            MosaicAsset(
+                path=str(d.path),
+                mosaic="elevation",
+                rescale_range=None,
+                minzoom=0,
+                maxzoom=18,
+            )
+            for d in self.datasets
+            if tile_feature.intersects(d.footprint)
         ]
 
 
@@ -58,16 +66,14 @@ def elevation_backend(elevation_models):
 @mark.anyio
 async def test_basic_tiler(mosaic_backend):
     test_tile = positions[0].tile
-    tile_data, assets = await mosaic_backend.tile(test_tile.x, test_tile.y, test_tile.z)
+    tile_data, assets = mosaic_backend.tile(test_tile.x, test_tile.y, test_tile.z)
     assert tile_data.data.shape == (1, 256, 256)
 
 
 @mark.anyio
 async def test_elevation_tiler(elevation_backend):
     test_tile = positions[0].tile
-    tile_data, assets = await elevation_backend.tile(
-        test_tile.x, test_tile.y, test_tile.z
-    )
+    tile_data, assets = elevation_backend.tile(test_tile.x, test_tile.y, test_tile.z)
     assert len(assets) == 2
     assert isinstance(tile_data, ImageData)
     assert tile_data.data.shape == (3, 256, 256)

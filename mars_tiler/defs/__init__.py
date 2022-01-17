@@ -1,6 +1,6 @@
 from morecantile import tms
 from morecantile.models import TileMatrixSet
-from .crs import MARS2000_SPHERE, MARS_MERCATOR
+from .crs import MARS2000_SPHERE, MARS_MERCATOR, MARS2000
 
 mercator_tms = tms.get("WebMercatorQuad")
 mars_tms = TileMatrixSet.custom(
@@ -9,4 +9,6 @@ mars_tms = TileMatrixSet.custom(
     extent_crs=MARS2000_SPHERE,
     title="Web Mercator Mars",
     geographic_crs=MARS2000_SPHERE,
+    minzoom=0,
+    maxzoom=24,
 )
