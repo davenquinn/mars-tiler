@@ -44,33 +44,6 @@ class MosaicRouteFactory(MosaicTilerFactory):
         self.tile()
         self.assets()
 
-    def get_cached_tile(self, mosaics, x, y, z):
-        db = get_database()
-        with db.connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    prepared_statement("get-cached-tile"),
-                    dict(x=x, y=y, z=z, mosaic=mosaics[0]),
-                )
-                return cursor.fetchone()
-
-    def set_cached_tile(self, mosaics, x, y, z, tile, sources=[], maxzoom=None):
-        mosaic = mosaics[0]
-        db = get_database()
-        with db.connection() as conn:
-            conn.execute(
-                prepared_statement("set-cached-tile"),
-                dict(
-                    x=x,
-                    y=y,
-                    z=z,
-                    tile=tile,
-                    mosaic=mosaic,
-                    sources=sources,
-                    maxzoom=maxzoom,
-                ),
-            )
-
     def tile(self):  # noqa: C901
         """Register /tiles endpoints."""
 
@@ -149,6 +122,7 @@ class MosaicRouteFactory(MosaicTilerFactory):
                         x,
                         y,
                         z,
+                        use_cache=use_cache,
                         pixel_selection=pixel_selection.method(),
                         tilesize=tilesize,
                         threads=threads,

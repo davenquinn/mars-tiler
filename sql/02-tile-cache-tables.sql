@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS tile_cache.tile (
   layer_id text NOT NULL REFERENCES tile_cache.layer(name),
   tile bytea,
   created timestamp without time zone DEFAULT now(),
+  last_used timestamp without time zone DEFAULT now(),
   maxzoom integer,
   sources text[],
   PRIMARY KEY (x, y, z, layer_id)
@@ -37,6 +38,7 @@ SELECT
 		null
 	END AS tile,
 	t.created,
+  t.last_used,
 	t.maxzoom,
 	t.sources
 FROM tile_cache.tile t
