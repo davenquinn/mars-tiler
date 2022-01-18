@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS tile_cache.layer (
   maxzoom integer
 );
 
+/* We need to add a TMS column to support non-mercator tiles */
 CREATE TABLE IF NOT EXISTS tile_cache.tile (
   z integer NOT NULL,
   x integer NOT NULL,

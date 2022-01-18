@@ -8,14 +8,15 @@ from titiler.core.dependencies import DatasetParams, PostProcessParams, Resampli
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 from titiler.mosaic.errors import MOSAIC_STATUS_CODES
 from titiler.core.resources.enums import OptionalHeader
-from .database import setup_database, get_sync_database
-from .routes import MosaicRouteFactory, get_datasets
+from .database import setup_database, get_sync_database, teardown_database
+from .routes import MosaicRouteFactory
 from .util import MarsCOGReader, dataset_path
 from .mosaic import (
     MarsMosaicBackend,
     ElevationMosaicBackend,
     mercator_tms,
 )
+from .mosaic.base import get_datasets
 
 
 def build_path(*args):
@@ -154,7 +155,7 @@ def healthcheck():
 
 @app.on_event("startup")
 async def startup_event():
-    await setup_database()
+    setup_database()
     logger = logging.getLogger("mars_tile_server")
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
@@ -163,5 +164,4 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    db = await get_database()
-    await db.disconnect()
+    await teardown_database()

@@ -1,5 +1,6 @@
 """Mosaic definitions (a close approximation of Cogeo-Mosaic BaseBackend)"""
 
+from http.client import NotConnected
 import os
 from dataclasses import dataclass
 from typing import Dict, Type
@@ -12,13 +13,14 @@ from titiler.mosaic.resources.enums import PixelSelectionMethod
 from fastapi import Depends, Path, Query
 from starlette.responses import Response, JSONResponse
 from fastapi.encoders import jsonable_encoder
+from fastapi import BackgroundTasks
 
 from morecantile import Tile
 from sparrow.utils import get_logger
 
 from .timer import Timer
 from .defs import mars_tms
-from .database import get_sync_database, prepared_statement
+from .database import get_sync_database, prepared_statement, get_database
 from .mosaic.base import PGMosaicBackend
 
 
@@ -41,6 +43,37 @@ class MosaicRouteFactory(MosaicTilerFactory):
         self.tile()
         self.assets()
 
+    def get_cached_tile(self, mosaics, x, y, z):
+        if len(mosaics) > 1:
+            # We don't support caching multiple mosaics yet
+            return None
+
+        db = get_database()
+
+        with db.connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    prepared_statement("get-cached-tile"),
+                    dict(x=x, y=y, z=z, mosaic=mosaics[0]),
+                )
+                resp = cursor.fetchone()
+                if resp is None:
+                    return None
+                (tile, sources, media_type, mosaic) = resp
+                return Response(content=bytes(tile), media_type=media_type)
+
+    def set_cached_tile(self, mosaics, x, y, z, tile, sources=[]):
+        if len(mosaics) > 1:
+            # We don't support caching multiple mosaics yet
+            return
+        mosaic = mosaics[0]
+        db = get_database()
+        with db.connection() as conn:
+            conn.execute(
+                prepared_statement("set-cached-tile"),
+                dict(x=x, y=y, z=z, tile=NotConnected, mosaic=mosaic, sources=sources),
+            )
+
     def tile(self):  # noqa: C901
         """Register /tiles endpoints."""
 
@@ -49,6 +82,7 @@ class MosaicRouteFactory(MosaicTilerFactory):
         @self.router.get(r"/tiles/{z}/{x}/{y}@{scale}x", **img_endpoint_params)
         @self.router.get(r"/tiles/{z}/{x}/{y}@{scale}x.{format}", **img_endpoint_params)
         def tile(
+            background_tasks: BackgroundTasks,
             z: int = Path(..., ge=0, le=30, description="Mercator tiles's zoom level"),
             x: int = Path(..., description="Mercator tiles's column"),
             y: int = Path(..., description="Mercator tiles's row"),
@@ -72,6 +106,10 @@ class MosaicRouteFactory(MosaicTilerFactory):
             headers: Dict[str, str] = {}
 
             tilesize = scale * 256
+
+            cached_tile = self.get_cached_tile(src_path, x, y, z)
+            if cached_tile:
+                return cached_tile
 
             threads = int(os.getenv("MOSAIC_CONCURRENCY", MAX_THREADS))
             timer = Timer()
@@ -112,11 +150,17 @@ class MosaicRouteFactory(MosaicTilerFactory):
             if OptionalHeader.server_timing in self.optional_headers:
                 headers["Server-Timing"] = timer.server_timings()
 
+            sources = [d.path for d in data.assets]
             if OptionalHeader.x_assets in self.optional_headers:
-                headers["X-Assets"] = ",".join([d.path for d in data.assets])
+                headers["X-Assets"] = ",".join(sources)
 
             maxzoom = max([d.maxzoom for d in data.assets])
             headers["X-Max-Zoom"] = str(maxzoom)
+
+            # Add the tile to the cache after returning it to the user.
+            background_tasks.add_task(
+                self.set_cached_tile, src_path, x, y, z, content, sources=sources
+            )
 
             return Response(content, media_type=format.mediatype, headers=headers)
 
