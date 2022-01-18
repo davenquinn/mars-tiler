@@ -1,15 +1,17 @@
+WITH tile AS (
+  SELECT (tile_cache.find_tile(%(x)s, %(y)s, %(z)s, %(mosaic)s)).*
+)
 SELECT
-  tile,
-  sources,
+  CASE WHEN t.x = %(x)s AND t.y = %(y)s AND t.z = %(z)s THEN
+    t.tile
+  ELSE
+    NULL
+  END AS tile,
+  t.tile IS NULL OR %(z)s > t.maxzoom AS should_return_null,
+  t.sources,
   l.content_type,
-  l.mosaic
-FROM tile_cache.tile t
+  l.mosaic,
+  t.maxzoom
+FROM tile t
 JOIN tile_cache.layer l
-  ON t.layer_id = l.name
-WHERE mosaic = %(mosaic)s
-  AND z = %(z)s
-  AND x = %(x)s
-  AND y = %(y)s
-  AND NOT stale
-  AND coalesce(l.minzoom, 0) <= z
-  AND z <= coalesce(l.maxzoom, 24)
+  ON t.layer_id = l.name;

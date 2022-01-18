@@ -14,6 +14,7 @@ from fastapi import Depends, Path, Query
 from starlette.responses import Response, JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi import BackgroundTasks
+from cogeo_mosaic.errors import NoAssetFoundError
 
 from morecantile import Tile
 from sparrow.utils import get_logger
@@ -44,12 +45,7 @@ class MosaicRouteFactory(MosaicTilerFactory):
         self.assets()
 
     def get_cached_tile(self, mosaics, x, y, z):
-        if len(mosaics) > 1:
-            # We don't support caching multiple mosaics yet
-            return None
-
         db = get_database()
-
         with db.connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -58,16 +54,21 @@ class MosaicRouteFactory(MosaicTilerFactory):
                 )
                 return cursor.fetchone()
 
-    def set_cached_tile(self, mosaics, x, y, z, tile, sources=[]):
-        if len(mosaics) > 1:
-            # We don't support caching multiple mosaics yet
-            return
+    def set_cached_tile(self, mosaics, x, y, z, tile, sources=[], maxzoom=None):
         mosaic = mosaics[0]
         db = get_database()
         with db.connection() as conn:
             conn.execute(
                 prepared_statement("set-cached-tile"),
-                dict(x=x, y=y, z=z, tile=tile, mosaic=mosaic, sources=sources),
+                dict(
+                    x=x,
+                    y=y,
+                    z=z,
+                    tile=tile,
+                    mosaic=mosaic,
+                    sources=sources,
+                    maxzoom=maxzoom,
+                ),
             )
 
     def tile(self):  # noqa: C901
@@ -105,18 +106,38 @@ class MosaicRouteFactory(MosaicTilerFactory):
 
             tilesize = scale * 256
 
+            should_cache_tile = use_cache
+            if len(src_path) > 1:
+                # We don't support caching multiple mosaics yet
+                use_cache = False
+
             threads = int(os.getenv("MOSAIC_CONCURRENCY", MAX_THREADS))
             timer = Timer()
             with timer.context() as t:
                 # with rasterio.Env(**self.gdal_config):
-                cached_tile = self.get_cached_tile(src_path, x, y, z)
-                t.add_step("check_cache")
-                if cached_tile:
-                    (tile, sources, media_type, mosaic) = cached_tile
-                    headers = self._tile_headers(timer, sources)
-                    return Response(
-                        content=bytes(tile), media_type=media_type, headers=headers
-                    )
+                if use_cache:
+                    should_cache_tile = True
+                    cached_tile = self.get_cached_tile(src_path, x, y, z)
+                    t.add_step("check_cache")
+                    if cached_tile:
+                        (
+                            tile,
+                            should_return_null,
+                            sources,
+                            media_type,
+                            mosaic,
+                            maxzoom,
+                        ) = cached_tile
+                        if should_return_null:
+                            raise NoAssetFoundError()
+                        if tile is not None:
+                            headers = self._tile_headers(timer, sources, maxzoom)
+                            headers["X-Tile-Cache"] = "hit"
+                            return Response(
+                                content=bytes(tile),
+                                media_type=media_type,
+                                headers=headers,
+                            )
 
                 with self.reader(
                     src_path,
@@ -151,24 +172,33 @@ class MosaicRouteFactory(MosaicTilerFactory):
                 t.add_step("format")
 
             sources = [d.path for d in data.assets]
+            maxzoom = max([d.maxzoom for d in data.assets])
 
             # Add the tile to the cache after returning it to the user.
-            background_tasks.add_task(
-                self.set_cached_tile, src_path, x, y, z, content, sources=sources
-            )
+            if should_cache_tile:
+                background_tasks.add_task(
+                    self.set_cached_tile,
+                    src_path,
+                    x,
+                    y,
+                    z,
+                    content,
+                    sources=sources,
+                    maxzoom=maxzoom,
+                )
 
-            headers = self._tile_headers(timer, sources)
-            maxzoom = max([d.maxzoom for d in data.assets])
-            headers["X-Max-Zoom"] = str(maxzoom)
+            headers = self._tile_headers(timer, sources, maxzoom)
+            headers["X-Tile-Cache"] = "miss" if use_cache else "bypass"
 
             return Response(content, media_type=format.mediatype, headers=headers)
 
-    def _tile_headers(self, timer, sources):
+    def _tile_headers(self, timer, sources, maxzoom):
         headers: Dict[str, str] = {}
         if OptionalHeader.server_timing in self.optional_headers:
             headers["Server-Timing"] = timer.server_timings()
         if OptionalHeader.x_assets in self.optional_headers:
             headers["X-Assets"] = ",".join(sources)
+        headers["X-Max-Zoom"] = str(maxzoom)
         return headers
 
     def assets(self):

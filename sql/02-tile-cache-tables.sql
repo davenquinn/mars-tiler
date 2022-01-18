@@ -10,17 +10,54 @@ CREATE TABLE IF NOT EXISTS tile_cache.layer (
 
 /* We need to add a TMS column to support non-mercator tiles */
 CREATE TABLE IF NOT EXISTS tile_cache.tile (
-  z integer NOT NULL,
   x integer NOT NULL,
   y integer NOT NULL,
+  z integer NOT NULL,
   layer_id text NOT NULL REFERENCES tile_cache.layer(name),
   tile bytea,
   created timestamp without time zone DEFAULT now(),
-  stale boolean,
-  empty boolean,
+  maxzoom integer,
   sources text[],
-  PRIMARY KEY (z, x, y, layer_id)
+  PRIMARY KEY (x, y, z, layer_id)
 );
+
+
+/* Functions to find cached tiles */
+CREATE OR REPLACE FUNCTION tile_cache.find_tile(_x integer, _y integer, _z integer, _mosaic text)
+RETURNS tile_cache.tile AS $$
+SELECT
+	x,
+	y,
+	z,
+	t.layer_id,
+  -- If tile is null that means that the tile should not be cached.
+	CASE WHEN _z <= t.maxzoom THEN
+		tile
+	ELSE
+		null
+	END AS tile,
+	t.created,
+	t.maxzoom,
+	t.sources
+FROM tile_cache.tile t
+JOIN tile_cache.layer l
+  ON t.layer_id = l.name
+WHERE layer_id = _mosaic
+  AND _z-t.z >= 0
+  -- Ensure we are within zoom of the layer
+  AND coalesce(l.minzoom, 0) <= z
+  AND z <= coalesce(l.maxzoom, 24)
+  AND _x >= t.x*power(2, _z-t.z)
+  AND _x < (t.x+1)*power(2, _z-t.z)
+  AND _y >= t.y*power(2,_z-t.z)
+  AND _y < (t.y+1)*power(2,_z-t.z)
+  AND _x >= 0
+  AND _x < power(2,_z)
+  AND _y >= 0
+  AND _y < power(2,_z)
+ORDER BY z DESC
+LIMIT 1;
+$$ LANGUAGE SQL IMMUTABLE;
 
 -- Link our tile cache to the tiler
 ALTER TABLE tile_cache.layer
