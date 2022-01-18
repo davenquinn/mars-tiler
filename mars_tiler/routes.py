@@ -56,11 +56,7 @@ class MosaicRouteFactory(MosaicTilerFactory):
                     prepared_statement("get-cached-tile"),
                     dict(x=x, y=y, z=z, mosaic=mosaics[0]),
                 )
-                resp = cursor.fetchone()
-                if resp is None:
-                    return None
-                (tile, sources, media_type, mosaic) = resp
-                return Response(content=bytes(tile), media_type=media_type)
+                return cursor.fetchone()
 
     def set_cached_tile(self, mosaics, x, y, z, tile, sources=[]):
         if len(mosaics) > 1:
@@ -71,7 +67,7 @@ class MosaicRouteFactory(MosaicTilerFactory):
         with db.connection() as conn:
             conn.execute(
                 prepared_statement("set-cached-tile"),
-                dict(x=x, y=y, z=z, tile=NotConnected, mosaic=mosaic, sources=sources),
+                dict(x=x, y=y, z=z, tile=tile, mosaic=mosaic, sources=sources),
             )
 
     def tile(self):  # noqa: C901
@@ -92,6 +88,9 @@ class MosaicRouteFactory(MosaicTilerFactory):
             format: ImageType = Query(
                 None, description="Output image type. Default is auto."
             ),
+            use_cache: bool = Query(
+                True, description="Allow the tile cache to be accessed."
+            ),
             src_path=Depends(self.path_dependency),
             layer_params=Depends(self.layer_dependency),
             dataset_params=Depends(self.dataset_dependency),
@@ -103,18 +102,22 @@ class MosaicRouteFactory(MosaicTilerFactory):
             render_params=Depends(self.render_dependency),
         ):
             """Create map tile from a COG."""
-            headers: Dict[str, str] = {}
 
             tilesize = scale * 256
-
-            cached_tile = self.get_cached_tile(src_path, x, y, z)
-            if cached_tile:
-                return cached_tile
 
             threads = int(os.getenv("MOSAIC_CONCURRENCY", MAX_THREADS))
             timer = Timer()
             with timer.context() as t:
                 # with rasterio.Env(**self.gdal_config):
+                cached_tile = self.get_cached_tile(src_path, x, y, z)
+                t.add_step("check_cache")
+                if cached_tile:
+                    (tile, sources, media_type, mosaic) = cached_tile
+                    headers = self._tile_headers(timer, sources)
+                    return Response(
+                        content=bytes(tile), media_type=media_type, headers=headers
+                    )
+
                 with self.reader(
                     src_path,
                     reader=self.dataset_reader,
@@ -147,22 +150,26 @@ class MosaicRouteFactory(MosaicTilerFactory):
                 )
                 t.add_step("format")
 
-            if OptionalHeader.server_timing in self.optional_headers:
-                headers["Server-Timing"] = timer.server_timings()
-
             sources = [d.path for d in data.assets]
-            if OptionalHeader.x_assets in self.optional_headers:
-                headers["X-Assets"] = ",".join(sources)
-
-            maxzoom = max([d.maxzoom for d in data.assets])
-            headers["X-Max-Zoom"] = str(maxzoom)
 
             # Add the tile to the cache after returning it to the user.
             background_tasks.add_task(
                 self.set_cached_tile, src_path, x, y, z, content, sources=sources
             )
 
+            headers = self._tile_headers(timer, sources)
+            maxzoom = max([d.maxzoom for d in data.assets])
+            headers["X-Max-Zoom"] = str(maxzoom)
+
             return Response(content, media_type=format.mediatype, headers=headers)
+
+    def _tile_headers(self, timer, sources):
+        headers: Dict[str, str] = {}
+        if OptionalHeader.server_timing in self.optional_headers:
+            headers["Server-Timing"] = timer.server_timings()
+        if OptionalHeader.x_assets in self.optional_headers:
+            headers["X-Assets"] = ",".join(sources)
+        return headers
 
     def assets(self):
         """Register /assets endpoint."""
