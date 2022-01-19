@@ -3,6 +3,7 @@ from sparrow.birdbrain import Database as SyncDatabase
 from sparrow.utils import relative_path
 from psycopg_pool import ConnectionPool
 from contextvars import ContextVar
+from pathlib import Path
 
 
 from fastapi import FastAPI
@@ -25,7 +26,6 @@ def setup_database() -> None:
 
 
 db_ctx = ContextVar("db_ctx", default=None)
-setup_database()
 
 
 def get_database():
@@ -44,11 +44,17 @@ async def teardown_database() -> None:
 db = None
 
 
-def get_sync_database():
+def initialize_database(db):
+    dn = Path(relative_path(__file__, "../sql"))
+    for file in sorted(dn.glob("*.sql")):
+        db.exec_sql(file)
+
+
+def get_sync_database(automap=False):
     global db
     if db is None:
         db = SyncDatabase(environ.get("FOOTPRINTS_DATABASE"))
-    if getattr(db, "mapper") is None:
+    if getattr(db, "mapper") is None and automap:
         db.automap()
         # We seem to have to remap public for changes to take hold...
         # db.mapper.reflect_schema("public")

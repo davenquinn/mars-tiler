@@ -12,7 +12,7 @@ from shapely.geometry import shape
 from sparrow.utils import relative_path, cmd
 from sparrow.dinosaur import Dinosaur
 
-from ..database import get_sync_database
+from ..database import get_sync_database, initialize_database
 from .mosaic import mosaic_cli, get_footprints
 
 import rasterio

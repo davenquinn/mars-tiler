@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+poetry run pytest \
+  --log-cli-level=DEBUG --show-capture=stdout \
+  --durations=10 --capture=tee-sys --color=yes \
+  $@
