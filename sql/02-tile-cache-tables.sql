@@ -23,8 +23,11 @@ CREATE TABLE IF NOT EXISTS tile_cache.tile (
 );
 
 
-/* Functions to find cached tiles */
-CREATE OR REPLACE FUNCTION tile_cache.find_tile(_x integer, _y integer, _z integer, _mosaic text)
+/* Functions to find cached tiles
+ This one finds parents and can perhaps be used for upscaling in the future.
+*/
+CREATE OR REPLACE FUNCTION
+  tile_cache.find_parent_tile(_x integer, _y integer, _z integer, _mosaic text)
 RETURNS tile_cache.tile AS $$
 SELECT
 	x,
