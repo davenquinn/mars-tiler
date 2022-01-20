@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from ..timer import Timer
 from ..database import get_sync_database, prepared_statement
 from ..util import dataset_path
+from ..database import get_sync_database, prepared_statement, get_database
 
 log = get_logger(__name__)
 
@@ -146,6 +147,33 @@ class PGMosaicBackend(BaseReader):
         return self.reader(
             asset.path, post_process=rescale_postprocessor(asset), **self.reader_options
         )
+
+    def get_cached_tile(self, mosaics, x, y, z):
+        db = get_database()
+        with db.connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    prepared_statement("get-cached-tile"),
+                    dict(x=x, y=y, z=z, mosaic=mosaics[0]),
+                )
+                return cursor.fetchone()
+
+    def set_cached_tile(self, mosaics, x, y, z, tile, sources=[], maxzoom=None):
+        mosaic = mosaics[0]
+        db = get_database()
+        with db.connection() as conn:
+            conn.execute(
+                prepared_statement("set-cached-tile"),
+                dict(
+                    x=x,
+                    y=y,
+                    z=z,
+                    tile=tile,
+                    mosaic=mosaic,
+                    sources=sources,
+                    maxzoom=maxzoom,
+                ),
+            )
 
     def tile(  # type: ignore
         self,

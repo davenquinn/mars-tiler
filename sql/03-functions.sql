@@ -1,4 +1,22 @@
 CREATE OR REPLACE FUNCTION
+  imagery.tile_envelope(
+    _x integer,
+    _y integer,
+    _z integer,
+    _tms text = 'mars_mercator'
+  ) RETURNS geometry(Polygon, 949900)
+AS $$
+  SELECT ST_Transform(
+    ST_TileEnvelope(
+      _z, _x, _y,
+      (SELECT bounds FROM imagery.tms WHERE name = _tms)
+    ),
+    949900
+  );
+$$ LANGUAGE SQL;
+
+
+CREATE OR REPLACE FUNCTION
   imagery.get_datasets(
     _x integer,
     _y integer,
@@ -26,13 +44,7 @@ RETURNS TABLE (
     ON d.mosaic = m.name
   WHERE ST_Intersects(
       footprint,
-      ST_Transform(
-        ST_TileEnvelope(
-          _z, _x, _y,
-          (SELECT bounds FROM imagery.tms WHERE name = _tms)
-        ),
-        949900
-      )
+      imagery.tile_envelope(_x, _y, _z, _tms)
     )
     AND mosaic = ANY(_mosaics)
     AND _z >= coalesce(d.minzoom, m.minzoom)-3

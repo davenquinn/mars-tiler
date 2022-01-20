@@ -26,12 +26,6 @@ cli = Typer(no_args_is_help=True)
 cli.add_typer(mosaic_cli, name="create-mosaic")
 
 
-def initialize_database(db):
-    dn = Path(relative_path(__file__, "../../sql"))
-    for file in sorted(dn.glob("*.sql")):
-        db.exec_sql(file)
-
-
 @cli.command(name="create-tables")
 def create_tables():
     db = get_sync_database()
