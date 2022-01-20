@@ -10,6 +10,8 @@ from geoalchemy2.shape import to_shape, WKBElement
 from morecantile import Tile
 from morecantile.errors import PointOutsideTMSBounds
 from pytest import mark, raises, warns
+
+from mars_tiler.app import dataset
 from .database import get_sync_database, initialize_database
 from .defs import mars_tms
 from .cli import _update_info
@@ -86,13 +88,15 @@ bad_tiles = [
 ]
 
 
+def geometry_scalar(query):
+    return to_shape(WKBElement(query.scalar()))
+
+
 def get_envelope(db, tile: Tile):
-    return to_shape(
-        WKBElement(
-            db.session.execute(
-                "SELECT imagery.tile_envelope(:x,:y,:z)",
-                dict(x=tile.x, y=tile.y, z=tile.z),
-            ).scalar()
+    return geometry_scalar(
+        db.session.execute(
+            "SELECT imagery.tile_envelope(:x,:y,:z)",
+            dict(x=tile.x, y=tile.y, z=tile.z),
         )
     )
 
@@ -137,3 +141,21 @@ class TestDatasets:
             == 3
         )
         assert db.session.query(db.model.imagery_mosaic).count() == 2
+
+    def test_tile_bounds(self, db):
+        res = db.session.execute(
+            "SELECT (imagery.parent_tile(footprint)).* FROM imagery.dataset WHERE name = :name",
+            dict(name="ESP_037156_1800_RED.byte"),
+        ).one()
+
+        tile_footprint = get_envelope(db, res)
+        assert tile_footprint.bounds == mars_tms.bounds(res)
+
+        dataset_footprint = geometry_scalar(
+            db.session.execute(
+                "SELECT footprint FROM imagery.dataset WHERE name = :name",
+                dict(name="ESP_037156_1800_RED.byte"),
+            )
+        )
+
+        assert tile_footprint.contains(dataset_footprint)
