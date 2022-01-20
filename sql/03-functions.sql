@@ -133,3 +133,35 @@ RETURNS TABLE (
 ) AS $$
   SELECT x, y, z FROM imagery.containing_tiles(_geom, _tms) LIMIT 1;
 $$ LANGUAGE sql STABLE;
+
+/** This function returns tile information for use in the API, all at once */
+CREATE OR REPLACE FUNCTION imagery.get_tile_info(_x integer, _y integer, _z integer, _layers text[])
+RETURNS TABLE (
+	datasets jsonb,
+	should_generate boolean,
+	cached_tile bytea,
+	content_type text
+) AS $$
+WITH ds AS (
+  SELECT row_to_json(imagery.get_datasets(_x, _y, _z, _layers)) _data
+),
+ds1 AS (
+  SELECT json_agg(ds._data) datasets FROM ds
+),
+cached AS (
+	SELECT tile, content_type FROM tile_cache.tile t
+	JOIN tile_cache.layer l ON t.layer_id = l.name
+	WHERE t.layer_id = _layers[0]
+	  AND t.x = _x
+	  AND t.y = _y
+	  AND t.z = _z
+	LIMIT 1
+)
+SELECT
+	datasets,
+	imagery.should_generate_tile(_x, _y, _z, _layers),
+	c.tile::bytea,
+	c.content_type::text	
+FROM ds1
+LEFT JOIN cached c ON true;
+$$ LANGUAGE SQL STABLE;

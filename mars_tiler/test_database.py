@@ -8,15 +8,11 @@ from os import environ
 from sparrow.utils import get_logger, relative_path
 from geoalchemy2.shape import to_shape, WKBElement
 from morecantile import Tile
-from morecantile.errors import PointOutsideTMSBounds
-from pytest import mark, raises, warns
+from pytest import mark, raises
 
-from mars_tiler.app import dataset
 from .database import get_sync_database, initialize_database
 from .defs import mars_tms
 from .cli import _update_info
-from sqlalchemy import event
-from sqlalchemy.orm import Session
 
 log = get_logger(__name__)
 
@@ -28,41 +24,18 @@ def db_conn():
     testing_db = environ.get("MARS_TILER_TEST_DATABASE")
     log.info(f"Database connection: {testing_db}")
     wait_for_database(testing_db)
-    with temp_database(testing_db, drop=False) as engine:
+    with temp_database(testing_db, drop=False, ensure_empty=True) as engine:
         environ["FOOTPRINTS_DATABASE"] = testing_db
-        db = get_sync_database(automap=True)
+        db = get_sync_database(automap=False)
         initialize_database(db)
+        db = get_sync_database(automap=True)
         yield db
 
 
-@fixture(scope="class")
+@fixture()
 def db(db_conn):
-    # https://docs.sqlalchemy.org/en/13/orm/session_transaction.html
-    # https://gist.github.com/zzzeek/8443477
-    connection = db_conn.engine.connect()
-    transaction = connection.begin()
-    session = Session(bind=connection)
-
-    # start the session in a SAVEPOINT...
-    # start the session in a SAVEPOINT...
-    session.begin_nested()
-
-    # then each time that SAVEPOINT ends, reopen it
-    @event.listens_for(session, "after_transaction_end")
-    def restart_savepoint(session, transaction):
-        if transaction.nested and not transaction._parent.nested:
-
-            # ensure that state is expired the way
-            # session.commit() at the top level normally does
-            # (optional step)
-            session.expire_all()
-            session.begin_nested()
-
-    db_conn.session = session
-    yield db_conn
-    session.close()
-    transaction.rollback()
-    connection.close()
+    with db_conn.session_scope():
+        yield db_conn
 
 
 def test_database(db):
@@ -142,10 +115,10 @@ class TestDatasets:
         )
         assert db.session.query(db.model.imagery_mosaic).count() == 2
 
-    def test_tile_bounds(self, db):
+    def _test_tile_bounds(self, db, name):
         res = db.session.execute(
             "SELECT (imagery.parent_tile(footprint)).* FROM imagery.dataset WHERE name = :name",
-            dict(name="ESP_037156_1800_RED.byte"),
+            dict(name=name),
         ).one()
 
         tile_footprint = get_envelope(db, res)
@@ -154,8 +127,14 @@ class TestDatasets:
         dataset_footprint = geometry_scalar(
             db.session.execute(
                 "SELECT footprint FROM imagery.dataset WHERE name = :name",
-                dict(name="ESP_037156_1800_RED.byte"),
+                dict(name=name),
             )
         )
 
         assert tile_footprint.contains(dataset_footprint)
+
+    def test_tile_bounds(self, db):
+        # We are currently having trouble parameterizing these as separate tests
+        res = db.session.query(db.model.imagery_dataset.name).all()
+        for row in res:
+            self._test_tile_bounds(db, row.name)
