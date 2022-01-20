@@ -95,7 +95,7 @@ class MarsCOGReader(COGReader):
 
 
 def post_process(elevation, mask):
-    rgb = data_to_rgb(elevation[0], -10000, 0.1)
+    rgb = data_to_rgb(elevation[0] - 10000, 0.1)
     return rgb, mask
 
 

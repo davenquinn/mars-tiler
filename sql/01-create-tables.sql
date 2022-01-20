@@ -13,7 +13,8 @@ VALUES (
 CREATE TABLE IF NOT EXISTS imagery.mosaic (
   name text PRIMARY KEY,
   minzoom integer,
-  maxzoom integer
+  maxzoom integer,
+  rescale_range numeric[]
 );
 
 CREATE TABLE IF NOT EXISTS imagery.dataset (

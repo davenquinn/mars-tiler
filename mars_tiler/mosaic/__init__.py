@@ -2,6 +2,7 @@ import attr
 from morecantile import tms
 from sparrow.utils import get_logger
 from titiler.core.utils import Timer
+import numpy as N
 
 from ..defs import mars_tms, MARS_MERCATOR, MARS2000_SPHERE
 from ..util import MarsCOGReader, HiRISEReader, data_to_rgb
@@ -26,7 +27,9 @@ class MarsMosaicBackend(PGMosaicBackend):
 class ElevationMosaicBackend(MarsMosaicBackend):
     def tile(self, *args, **kwargs):
         im, assets = super().tile(*args, **kwargs)
-        im.data = data_to_rgb(im.data[0], -10000, 0.1)
+        data = N.ma.masked_array(im.data[0], mask=im.mask == 0)
+
+        im.data = data_to_rgb(data, -10000, 0.1)
         Timer.add_step("rgbencode")
         return (im, assets)
 

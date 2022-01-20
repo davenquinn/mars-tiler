@@ -1,1 +1,1 @@
-SELECT (imagery.get_datasets(%(x)s, %(y)s, %(z)s, %(mosaics)s)).*;
+SELECT (imagery.get_datasets(:x, :y, :z, :mosaics)).*;

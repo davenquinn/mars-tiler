@@ -61,7 +61,7 @@ def get_datasets(tile, mosaics: List[str]) -> List[MosaicAsset]:
     Timer.add_step("dbconnect")
     res = db.session.execute(
         prepared_statement("get-paths"),
-        dict(x1=bbox.west, y1=bbox.south, x2=bbox.east, y2=bbox.north, mosaics=mosaics),
+        dict(x=tile.x, y=tile.y, z=tile.z, mosaics=mosaics),
     )
     Timer.add_step("findassets")
 
@@ -181,6 +181,7 @@ class PGMosaicBackend(BaseReader):
         y: int,
         z: int,
         reverse: bool = False,
+        use_cache: bool = True,
         **kwargs: Any,
     ) -> Tuple[ImageData, List[object]]:
         """Get Tile from multiple observation."""

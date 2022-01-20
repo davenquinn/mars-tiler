@@ -27,22 +27,20 @@ from .mosaic.base import PGMosaicBackend
 
 log = get_logger(__name__)
 
-stmt_cache = {}
-
-
-def prepare_record(d):
-    data = dict(**d)
-    data["geometry"] = loads(d["geometry"])
-    return data
-
 
 @dataclass
 class MosaicRouteFactory(MosaicTilerFactory):
     reader: Type[PGMosaicBackend] = PGMosaicBackend
 
     def register_routes(self):
+        self.root()
         self.tile()
         self.assets()
+
+    def root(self):
+        @self.router.get("/")
+        def root(mosaic=Depends(self.path_dependency)):
+            return {"mosaic": mosaic}
 
     def tile(self):  # noqa: C901
         """Register /tiles endpoints."""
@@ -225,5 +223,5 @@ class MosaicRouteFactory(MosaicTilerFactory):
             )
             return {
                 "type": "FeatureCollection",
-                "features": [prepare_record(d) for d in data],
+                "features": list(data),
             }

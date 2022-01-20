@@ -1,41 +1,35 @@
 from sqlalchemy.exc import InternalError
 from pytest import fixture
-from sparrow.birdbrain.util import wait_for_database, temp_database
 from decimal import Decimal
 from pathlib import Path
-from dotenv import load_dotenv
 from os import environ
 from sparrow.utils import get_logger, relative_path
 from geoalchemy2.shape import to_shape, WKBElement
 from morecantile import Tile
 from pytest import mark, raises
 
-from .database import get_sync_database, initialize_database
+from .database import get_sync_database
 from .defs import mars_tms
 from .cli import _update_info
 
 log = get_logger(__name__)
 
-load_dotenv()
-
 
 @fixture(scope="session")
-def db_conn():
-    testing_db = environ.get("MARS_TILER_TEST_DATABASE")
-    log.info(f"Database connection: {testing_db}")
-    wait_for_database(testing_db)
-    with temp_database(testing_db, drop=False, ensure_empty=True) as engine:
-        environ["FOOTPRINTS_DATABASE"] = testing_db
-        db = get_sync_database(automap=False)
-        initialize_database(db)
-        db = get_sync_database(automap=True)
-        yield db
+def test_datasets(db_conn, fixtures_dir):
+    db = db_conn
+    with db.session_scope():
+        Mosaic = db.model.imagery_mosaic
+        for name in ["hirise_red", "elevation_model"]:
+            db.session.add(Mosaic(name=name))
+        db.session.commit()
 
+        hirise = fixtures_dir.glob("*.tif")
+        _update_info(hirise, mosaic="hirise_red")
 
-@fixture()
-def db(db_conn):
-    with db_conn.session_scope():
-        yield db_conn
+        elevation_models = (fixtures_dir / "elevation-models").glob("*.tif")
+        _update_info(elevation_models, mosaic="elevation_model")
+        return db.session.query(db.model.imagery_dataset).all()
 
 
 def test_database(db):
@@ -86,9 +80,6 @@ def test_bad_tile(db, tile):
         get_envelope(db, tile)
 
 
-fixtures_dir = Path(relative_path(__file__, "..", "test-fixtures"))
-
-
 class TestDatasets:
     def test_add_mosaics(self, db):
         Mosaic = db.model.imagery_mosaic
@@ -96,14 +87,7 @@ class TestDatasets:
         db.session.add(Mosaic(name="elevation_model"))
         db.session.commit()
 
-    def test_ingest_datasets(self, db):
-        get_sync_database(automap=True)
-        hirise = fixtures_dir.glob("*.tif")
-        _update_info(hirise, mosaic="hirise_red")
-
-        elevation_models = (fixtures_dir / "elevation-models").glob("*.tif")
-        _update_info(elevation_models, mosaic="elevation_model")
-
+    def test_ingest_datasets(self, db, test_datasets):
         Dataset = db.model.imagery_dataset
 
         assert db.session.query(Dataset).count() == 4

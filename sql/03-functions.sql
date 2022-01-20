@@ -158,7 +158,7 @@ cached AS (
 	LIMIT 1
 )
 SELECT
-	datasets,
+	datasets::jsonb,
 	imagery.should_generate_tile(_x, _y, _z, _layers),
 	c.tile::bytea,
 	c.content_type::text	
