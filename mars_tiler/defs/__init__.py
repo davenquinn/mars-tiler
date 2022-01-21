@@ -1,23 +1,27 @@
 from morecantile import tms
 from morecantile.models import TileMatrixSet
 from .crs import MARS2000_SPHERE, MARS_MERCATOR, MARS2000, mars_mercator_wkt, MARS_EQC
+import rasterio
 
 mercator_tms = tms.get("WebMercatorQuad")
 
-import rasterio
+# monkey-patch rasterio to use Mars projections
+
+_CRS_OLD = rasterio.crs.CRS
 
 
-class MarsCRS(rasterio.crs.CRS):
+class MarsCRS(_CRS_OLD):
     def to_epsg(self):
         return None
 
     def to_authority(self):
-        return "IAU"
+        return None
+
+
+rasterio.crs.CRS = MarsCRS
 
 
 class MarsTMS(TileMatrixSet):
-    ...
-
     @property
     def rasterio_crs(self):
         """Return rasterio CRS."""

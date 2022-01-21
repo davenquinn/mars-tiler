@@ -3,25 +3,25 @@ import rasterio
 
 mars_radius = 3396190
 MARS2000_SPHERE = CRS.from_dict({"proj": "longlat", "R": mars_radius, "no_defs": True})
-MARS2000_SPHERE = CRS.from_wkt(
-    """GEOGCRS["unknown",
-    DATUM["Mars_2000_(Sphere)",
-        ELLIPSOID["Mars_2000_Sphere_IAU_IAG",3396190,0,
-            LENGTHUNIT["metre",1,
-                ID["EPSG",9001]]]],
-    PRIMEM["Reference meridian",0,
-        ANGLEUNIT["degree",0.0174532925199433,
-            ID["EPSG",9122]]],
-    CS[ellipsoidal,2],
-        AXIS["longitude",east,
-            ORDER[1],
-            ANGLEUNIT["degree",0.0174532925199433,
-                ID["EPSG",9122]]],
-        AXIS["latitude",north,
-            ORDER[2],
-            ANGLEUNIT["degree",0.0174532925199433,
-                ID["EPSG",9122]]]]"""
-)
+# MARS2000_SPHERE = CRS.from_wkt(
+#     """GEOGCRS["unknown",
+#     DATUM["Mars_2000_(Sphere)",
+#         ELLIPSOID["Mars_2000_Sphere_IAU_IAG",3396190,0,
+#             LENGTHUNIT["metre",1,
+#                 ID["EPSG",9001]]]],
+#     PRIMEM["Reference meridian",0,
+#         ANGLEUNIT["degree",0.0174532925199433,
+#             ID["EPSG",9122]]],
+#     CS[ellipsoidal,2],
+#         AXIS["longitude",east,
+#             ORDER[1],
+#             ANGLEUNIT["degree",0.0174532925199433,
+#                 ID["EPSG",9122]]],
+#         AXIS["latitude",north,
+#             ORDER[2],
+#             ANGLEUNIT["degree",0.0174532925199433,
+#                 ID["EPSG",9122]]]]"""
+# )
 
 
 MARS2000 = CRS.from_dict(
@@ -65,7 +65,7 @@ mars_mercator_wkt = """PROJCRS["Mars 2000 / Pseudo-Mercator",
             LENGTHUNIT["metre",1]]
     ]"""
 
-MARS_MERCATOR = CRS.from_wkt(mars_mercator_wkt)
+# MARS_MERCATOR = CRS.from_wkt(mars_mercator_wkt)
 
 MARS_EQC = CRS.from_dict(
     dict(
