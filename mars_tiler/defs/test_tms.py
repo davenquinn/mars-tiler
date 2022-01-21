@@ -1,6 +1,7 @@
 from morecantile.models import TileMatrixSet, Tile
 from pydantic import BaseModel
 from pytest import mark
+import rasterio
 from .crs import mars_radius
 from . import MARS2000_SPHERE, MARS_MERCATOR, mercator_tms, mars_tms
 
@@ -41,3 +42,58 @@ def test_positions(pos):
 def test_mars_positions(pos):
     """Returned positions should be the same for Earth and Mars Mercator TMS"""
     _test_tms(mars_tms, pos)
+
+
+dataset_wkt = """PROJCRS["EQUIRECTANGULAR MARS",
+BASEGEOGCRS["GCS_MARS",
+    DATUM["D_MARS",
+        ELLIPSOID["MARS_localRadius",3396190,0,
+            LENGTHUNIT["metre",1,
+                ID["EPSG",9001]]]],
+    PRIMEM["Reference_Meridian",0,
+        ANGLEUNIT["degree",0.0174532925199433,
+            ID["EPSG",9122]]]],
+CONVERSION["Equidistant Cylindrical",
+    METHOD["Equidistant Cylindrical",
+        ID["EPSG",1028]],
+    PARAMETER["Latitude of 1st standard parallel",0,
+        ANGLEUNIT["degree",0.0174532925199433],
+        ID["EPSG",8823]],
+    PARAMETER["Longitude of natural origin",149.9,
+        ANGLEUNIT["degree",0.0174532925199433],
+        ID["EPSG",8802]],
+    PARAMETER["False easting",0,
+        LENGTHUNIT["metre",1],
+        ID["EPSG",8806]],
+    PARAMETER["False northing",0,
+        LENGTHUNIT["metre",1],
+        ID["EPSG",8807]]],
+CS[Cartesian,2],
+    AXIS["easting",east,
+        ORDER[1],
+        LENGTHUNIT["metre",1,
+            ID["EPSG",9001]]],
+    AXIS["northing",north,
+        ORDER[2],
+        LENGTHUNIT["metre",1,
+            ID["EPSG",9001]]]]
+"""
+
+
+def test_crs_transformation_speed():
+    for i in range(5000):
+        crs = MARS2000_SPHERE.to_wkt()
+        rasterio.crs.CRS.from_wkt(crs)
+
+
+def test_crs_transformation_speed_wkt():
+    for i in range(5000):
+        rasterio.crs.CRS.from_wkt(dataset_wkt)
+
+
+def test_crs_transformations_internal():
+    for i in range(5000):
+        crs = MARS2000_SPHERE.to_wkt()
+        rcrs = rasterio.crs.CRS.from_wkt(crs)
+        rcrs.to_epsg()
+        rcrs.to_authority()

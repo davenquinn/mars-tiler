@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-printenv
-
 poetry run pytest \
   --show-capture=stdout \
   --durations=10 --capture=tee-sys --color=yes \
