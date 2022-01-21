@@ -62,6 +62,7 @@ class MosaicRouteFactory(MosaicTilerFactory):
                 layers=mosaics,
             ),
         )
+        db.session.commit()
 
     def tile(self):  # noqa: C901
         """Register /tiles endpoints."""
