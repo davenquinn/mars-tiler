@@ -51,8 +51,6 @@ COPY ./ /code/
 
 # Install the root package
 RUN poetry install --no-interaction --no-ansi
-# Override some poetry packages with local versions
-RUN pip install -r poetry-overrides.txt
 
 # Attempt to fix certificates for LetsEncrypt
 # https://github.com/brazil-data-cube/stac.py/issues/112
