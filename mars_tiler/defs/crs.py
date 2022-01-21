@@ -9,3 +9,17 @@ MARS2000 = CRS.from_dict(
 
 MARS_MERCATOR = CRS.from_dict({"proj": "merc", "R": mars_radius, "no_defs": True})
 MARS_MERCATOR.linear_units = "metre"
+
+MARS_EQC = CRS.from_dict(
+    dict(
+        proj="eqc",
+        lat_ts=0,
+        lat_0=0,
+        lon_0=180,
+        x_0=0,
+        y_0=0,
+        R=mars_radius,
+        units="m",
+        no_defs=True,
+    )
+)

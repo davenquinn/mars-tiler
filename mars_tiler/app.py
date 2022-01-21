@@ -2,6 +2,10 @@ from dataclasses import dataclass
 from typing import List
 import logging
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI, Query
 from titiler.core.factory import TilerFactory
 from titiler.core.dependencies import DatasetParams, PostProcessParams, ResamplingName

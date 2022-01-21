@@ -84,7 +84,10 @@ def _update_info(datasets, mosaic=None):
 
         if mosaic is not None:
             kw["mosaic"] = mosaic
-        kw["info"] = get_json_info(path)
+        try:
+            kw["info"] = get_json_info(path)
+        except Exception as e:
+            pass
 
         dataset = db.get_or_create(Dataset, name=path.stem)
         for k, v in kw.items():

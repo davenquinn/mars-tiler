@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+printenv
 
 poetry run pytest \
   --show-capture=stdout \

@@ -56,6 +56,8 @@ RUN poetry install --no-interaction --no-ansi
 # https://github.com/brazil-data-cube/stac.py/issues/112
 RUN pip install certifi-system-store && python -m certifi -v
 
+RUN apt-get update && apt-get install -y postgresql-client
+
 
 CMD gunicorn mars_tiler:app \
   --bind 0.0.0.0:8000 \

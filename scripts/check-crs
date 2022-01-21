@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+set -o allexport
+source .env
+set +o allexport
+
+poetry run gdalinfo -proj4 /vsicurl/${1:-https://argyre.geoscience.wisc.edu/global-dems/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.cog.tif}

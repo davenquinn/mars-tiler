@@ -1,0 +1,15 @@
+services:
+  tile_server:
+    build: .
+    command: scripts/run-tests
+    depends_on:
+      - db
+    environment:
+      - MARS_TILER_TEST_DATABASE=postgresql://postgres@db:5432/mars_tiler_test
+  db:
+    image: postgis/postgis:13-3.1
+    environment:
+      - POSTGRES_DB=mars_tiler_test
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    ports:
+      - "54321:5432"
