@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
 poetry run pytest \
-  --log-cli-level=INFO --show-capture=stdout \
+  --show-capture=stdout \
   --durations=10 --capture=tee-sys --color=yes \
   $@

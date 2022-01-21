@@ -1,6 +1,5 @@
 """Mosaic definitions (a close approximation of Cogeo-Mosaic BaseBackend)"""
 
-from http.client import NotConnected
 import os
 from dataclasses import dataclass
 from typing import Dict, Type, List, Optional
@@ -102,19 +101,13 @@ class MosaicRouteFactory(MosaicTilerFactory):
 
             tile_assets: Optional[List[MosaicAsset]] = None
 
-            should_cache_tile = use_cache
-            if len(src_path) > 1:
-                # We don't support caching multiple mosaics yet
-                use_cache = False
-
             threads = int(os.getenv("MOSAIC_CONCURRENCY", MAX_THREADS))
             timer = Timer()
             with timer.context() as t, rasterio.Env(**self.gdal_config):
                 if use_cache:
-                    should_cache_tile = True
                     tile_info = self.get_cached_tile(src_path, x, y, z)
                     t.add_step("check_cache")
-                    tile_assets = [create_asset(d) for d in tile_info.datasets]
+                    tile_assets = [create_asset(d) for d in tile_info.datasets or []]
                     if tile_info.cached_tile is not None:
                         headers = self._tile_headers(timer, tile_assets)
                         headers["X-Tile-Cache"] = "hit"
@@ -161,7 +154,7 @@ class MosaicRouteFactory(MosaicTilerFactory):
                 t.add_step("format")
 
             # Add the tile to the cache after returning it to the user.
-            if should_cache_tile:
+            if use_cache:
                 background_tasks.add_task(
                     self.set_cached_tile, src_path, x, y, z, content
                 )

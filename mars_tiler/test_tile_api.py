@@ -3,7 +3,7 @@ Tests for tiling APIs. These must run after the database setup and image ingesti
 """
 from fastapi.testclient import TestClient
 from .app import app
-from pytest import fixture
+from pytest import fixture, mark
 from .test_database import test_datasets
 from sparrow.utils import get_logger
 
@@ -73,12 +73,17 @@ class TestTileAPI:
         assert response.headers["X-Tile-Cache"] == "hit"
         log.info(response.headers["Server-Timing"])
 
-    def test_tile_get_hirise(self, client, db):
-        tile_address = dict(z=10, x=940, y=512)
+    @mark.parametrize("z", range(7, 12))
+    def test_tile_get_hirise(self, client, z):
+        scalar = 2 ** (10 - z)
+        tile_address = dict(x=int(940 / scalar), y=int(512 / scalar), z=z)
         response = client.get(
             "/mosaic/hirise_red/tiles/{z}/{x}/{y}.png".format(**tile_address),
         )
-        assert response.status_code == 200
+        expected_response = 200 if z >= 8 else 404
+        assert response.status_code == expected_response
+        if expected_response == 404:
+            return
         assert response.headers["Content-Type"] == "image/png"
         assert response.headers["X-Tile-Cache"] == "miss"
         log.info(response.headers["Server-Timing"])
