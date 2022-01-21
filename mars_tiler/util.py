@@ -93,7 +93,7 @@ class MarsCOGReader(COGReader):
         self.geographic_crs = MARS2000
         super().__attrs_post_init__()
         # if self.crs.is_geographic and self.crs.data["R"] == mars_radius:
-        #     self.vrt_options = dict(crs=MARS_EQC)
+        # self.vrt_options = dict(crs=MarsCRS.from_wkt(self.crs.to_wkt()))
 
 
 def post_process(elevation, mask):

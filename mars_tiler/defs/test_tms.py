@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from pytest import mark
 import rasterio
 from .crs import mars_radius
-from . import MARS2000_SPHERE, MARS_MERCATOR, mercator_tms, mars_tms
+from . import MARS2000_SPHERE, MARS_MERCATOR, mercator_tms, mars_tms, MarsCRS
 
 
 class PositionTest(BaseModel):
@@ -91,9 +91,26 @@ def test_crs_transformation_speed_wkt():
         rasterio.crs.CRS.from_wkt(dataset_wkt)
 
 
-def test_crs_transformations_internal():
+@mark.skip(reason="slow")
+def test_crs_internal_calls():
     for i in range(5000):
         crs = MARS2000_SPHERE.to_wkt()
         rcrs = rasterio.crs.CRS.from_wkt(crs)
+        rcrs.to_epsg()
+        rcrs.to_authority()
+
+
+def test_crs_internal_calls_mars():
+    for i in range(5000):
+        crs = MARS2000_SPHERE.to_wkt()
+        rcrs = MarsCRS.from_wkt(crs)
+        rcrs.to_epsg()
+        rcrs.to_authority()
+
+
+def test_crs_internal_calls_mars_mercator():
+    for i in range(5000):
+        crs = MARS_MERCATOR.to_wkt()
+        rcrs = MarsCRS.from_wkt(crs)
         rcrs.to_epsg()
         rcrs.to_authority()
