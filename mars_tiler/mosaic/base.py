@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from ..timer import Timer
 from ..database import get_sync_database, prepared_statement
 from ..util import dataset_path
+from ..database import get_sync_database, prepared_statement, get_database
 
 log = get_logger(__name__)
 
@@ -32,6 +33,7 @@ class MosaicAsset(BaseModel):
     rescale_range: Optional[List[float]]
     minzoom: int
     maxzoom: int
+    overscaled: bool
 
 
 def create_asset(d):
@@ -42,6 +44,7 @@ def create_asset(d):
         rescale_range=row.get("rescale_range", None),
         minzoom=int(row["minzoom"]),
         maxzoom=int(row["maxzoom"]),
+        overscaled=bool(row["overscaled"]),
     )
 
 
@@ -54,26 +57,16 @@ def get_path(d: str):
 
 
 def get_datasets(tile, mosaics: List[str]) -> List[MosaicAsset]:
-    bbox = bounds(tile.x, tile.y, tile.z)
     Timer.add_step("tilebounds")
     db = get_sync_database()
     Timer.add_step("dbconnect")
     res = db.session.execute(
-        prepared_statement("get-paths"),
-        dict(x1=bbox.west, y1=bbox.south, x2=bbox.east, y2=bbox.north, mosaics=mosaics),
+        "SELECT (imagery.get_datasets(:x, :y, :z, :mosaics)).*",
+        dict(x=tile.x, y=tile.y, z=tile.z, mosaics=mosaics),
     )
     Timer.add_step("findassets")
 
-    assets = [create_asset(d) for d in res if int(d._mapping["minzoom"]) - 5 < tile.z]
-    # and d._mapping.get("mosaic", None) in mosaics]
-
-    if len(mosaics) == 1:
-        return assets
-    # Reorder assets to ensure that mosaics listed first are put on top
-    reordered_assets = assets
-    for mos in mosaics:
-        reordered_assets += [a for a in assets if a.mosaic == mos]
-    return reordered_assets
+    return [create_asset(d) for d in res if int(d._mapping["minzoom"]) - 5 < tile.z]
 
 
 def rescale_postprocessor(asset: MosaicAsset):
@@ -153,15 +146,17 @@ class PGMosaicBackend(BaseReader):
         y: int,
         z: int,
         reverse: bool = False,
+        assets: Optional[List[MosaicAsset]] = None,
         **kwargs: Any,
     ) -> Tuple[ImageData, List[object]]:
         """Get Tile from multiple observation."""
-        mosaic_assets = self.assets_for_tile(x, y, z)
-        if not mosaic_assets:
+        if assets is None:
+            assets = self.assets_for_tile(x, y, z)
+        if not assets:
             raise NoAssetFoundError(f"No assets found for tile {z}-{x}-{y}")
 
         if reverse:
-            mosaic_assets = list(reversed(mosaic_assets))
+            assets = list(reversed(assets))
 
         def _reader(
             asset: MosaicAsset, x: int, y: int, z: int, **kwargs: Any
@@ -169,7 +164,7 @@ class PGMosaicBackend(BaseReader):
             with self._reader(asset) as src_dst:
                 return src_dst.tile(x, y, z, **kwargs)
 
-        data = mosaic_reader(mosaic_assets, _reader, x, y, z, **kwargs)
+        data = mosaic_reader(assets, _reader, x, y, z, **kwargs)
         Timer.add_step("readdata")
         return data
 

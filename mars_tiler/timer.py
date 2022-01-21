@@ -38,9 +38,10 @@ class Timer:
         return rec
 
     def server_timings(self):
-        return ", ".join(
-            [f"{t.name};dur={round(t.delta*1000, 1)}" for t in self.timings[1:]]
-        )
+        self._add_step("end")
+        timings = [f"{t.name};dur={round(t.delta*1000, 1)}" for t in self.timings[1:-1]]
+        timings.append(f"total;dur={round(self.timings[-1].total*1000, 1)}")
+        return ", ".join(timings)
 
     @contextmanager
     def context(self):

@@ -6,7 +6,7 @@ install:
 	poetry install
 
 test:
-	poetry run pytest --log-cli-level=INFO --show-capture=stdout --durations=10
+	./scripts/run-tests
 
 run:
 	poetry run ./scripts/run-local

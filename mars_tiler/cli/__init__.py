@@ -12,13 +12,16 @@ from shapely.geometry import shape
 from sparrow.utils import relative_path, cmd
 from sparrow.dinosaur import Dinosaur
 
-from ..database import get_sync_database
+from ..database import get_sync_database, initialize_database
 from .mosaic import mosaic_cli, get_footprints
+
+from dotenv import load_dotenv
 
 import rasterio
 import logging
 import sys
 
+load_dotenv()
 # logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 cli = Typer(no_args_is_help=True)
@@ -26,15 +29,9 @@ cli = Typer(no_args_is_help=True)
 cli.add_typer(mosaic_cli, name="create-mosaic")
 
 
-def initialize_database(db):
-    dn = Path(relative_path(__file__, "../../sql"))
-    for file in sorted(dn.glob("*.sql")):
-        db.exec_sql(file)
-
-
 @cli.command(name="create-tables")
 def create_tables():
-    db = get_sync_database()
+    db = get_sync_database(automap=True)
     initialize_database(db)
 
 
