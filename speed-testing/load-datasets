@@ -1,0 +1,21 @@
+#!/usr/bin/env python
+import cProfile
+from pathlib import Path
+from mars_tiler.defs.crs import MARS_MERCATOR
+import rasterio
+from rasterio.vrt import WarpedVRT
+from dotenv import load_dotenv
+
+load_dotenv()
+
+datasets = (Path(__file__).parent.parent / "test-fixtures").glob("**/*.tif")
+
+
+def open_all_vrts():
+    for file in datasets:
+        with rasterio.open(file) as src:
+            with WarpedVRT(src, crs=MARS_MERCATOR) as vrt:
+                vrt.read(1)
+
+
+cProfile.run(f"open_all_vrts()", sort="cumtime")
