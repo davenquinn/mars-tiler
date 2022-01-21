@@ -19,8 +19,10 @@ positions = [
 
 
 def test_mars_projection():
-    assert MARS2000_SPHERE.to_dict().get("R") == mars_radius
-    assert MARS_MERCATOR.to_dict().get("R") == mars_radius
+    assert (
+        MARS_MERCATOR.ellipsoid.semi_major_metre
+        == MARS2000_SPHERE.ellipsoid.semi_major_metre
+    )
 
 
 def _test_tms(tms: TileMatrixSet, pos: PositionTest):
