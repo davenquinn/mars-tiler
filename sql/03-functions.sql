@@ -48,7 +48,8 @@ RETURNS TABLE (
     )
     AND mosaic = ANY(_mosaics)
     AND _z >= coalesce(d.minzoom, m.minzoom)-3
-  ORDER BY maxzoom DESC;
+  -- First order by mosaic, then by maxzoom within each mosaic.
+  ORDER BY array_position(_mosaics, m.name), maxzoom DESC;
 $$ LANGUAGE SQL STABLE;
 
 -- This currently only works for square tiles.
@@ -142,26 +143,39 @@ RETURNS TABLE (
 	cached_tile bytea,
 	content_type text
 ) AS $$
-WITH ds AS (
-  SELECT row_to_json(imagery.get_datasets(_x, _y, _z, _layers)) _data
-),
-ds1 AS (
-  SELECT json_agg(ds._data) datasets FROM ds
-),
-cached AS (
-	SELECT tile, content_type FROM tile_cache.tile t
-	JOIN tile_cache.layer l ON t.layer_id = l.name
-	WHERE t.layer_id = _layers[0]
-	  AND t.x = _x
-	  AND t.y = _y
-	  AND t.z = _z
-	LIMIT 1
-)
-SELECT
-	datasets::jsonb,
-	imagery.should_generate_tile(_x, _y, _z, _layers),
-	c.tile::bytea,
-	c.content_type::text	
-FROM ds1
-LEFT JOIN cached c ON true;
-$$ LANGUAGE SQL STABLE;
+BEGIN
+  RETURN QUERY
+  WITH ds AS (
+    SELECT row_to_json(imagery.get_datasets(_x, _y, _z, _layers)) _data
+  ),
+  ds1 AS (
+    SELECT json_agg(ds._data) datasets FROM ds
+  ),
+  cached AS (
+    SELECT
+      tile,
+      p.content_type
+    FROM tile_cache.tile t
+    JOIN tile_cache.profile p ON t.profile = p.name
+    WHERE t.layers = _layers
+      AND t.x = _x
+      AND t.y = _y
+      AND t.z = _z
+    LIMIT 1
+  ), update_cache AS (
+    UPDATE tile_cache.tile
+      SET last_used = now()
+    WHERE x = _x
+      AND y = _y
+      AND z = _z
+      AND layers = _layers
+  )
+  SELECT
+    ds1.datasets::jsonb,
+    imagery.should_generate_tile(_x, _y, _z, _layers),
+    c.tile::bytea,
+    c.content_type::text	
+  FROM ds1
+  LEFT JOIN cached c ON true;
+END;
+$$ LANGUAGE plpgsql VOLATILE;

@@ -1,7 +1,7 @@
 CREATE SCHEMA tile_cache;
 
-CREATE TABLE IF NOT EXISTS tile_cache.layer (
-  name text PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS tile_cache.profile (
+  name text NOT NULL PRIMARY KEY,
   format text NOT NULL,
   content_type text NOT NULL,
   minzoom integer,
@@ -13,27 +13,28 @@ CREATE TABLE IF NOT EXISTS tile_cache.tile (
   x integer NOT NULL,
   y integer NOT NULL,
   z integer NOT NULL,
-  layer_id text NOT NULL REFERENCES tile_cache.layer(name),
-  tile bytea,
-  created timestamp without time zone DEFAULT now(),
-  last_used timestamp without time zone DEFAULT now(),
-  maxzoom integer,
-  sources text[],
-  PRIMARY KEY (x, y, z, layer_id)
+  layers text[] NOT NULL,
+  profile text NOT NULL REFERENCES tile_cache.profile(name),
+  tile bytea NOT NULL,
+  created timestamp without time zone NOT NULL DEFAULT now(),
+  last_used timestamp without time zone NOT NULL DEFAULT now(),
+  has_children boolean,
+  PRIMARY KEY (x, y, z, layers)
 );
 
 
 /* Functions to find cached tiles
  This one finds parents and can perhaps be used for upscaling in the future.
 */
+/*
 CREATE OR REPLACE FUNCTION
-  tile_cache.find_parent_tile(_x integer, _y integer, _z integer, _mosaic text)
+  tile_cache.find_parent_tile(_x integer, _y integer, _z integer, _layers text)
 RETURNS tile_cache.tile AS $$
 SELECT
 	x,
 	y,
 	z,
-	t.layer_id,
+	t.layers,
   -- If tile is null that means that the tile should not be cached.
 	CASE WHEN _z <= t.maxzoom THEN
 		tile
@@ -45,13 +46,13 @@ SELECT
 	t.maxzoom,
 	t.sources
 FROM tile_cache.tile t
-JOIN tile_cache.layer l
-  ON t.layer_id = l.name
-WHERE layer_id = _mosaic
+JOIN tile_cache.profile p
+  ON t.profile= p.name
+WHERE layers = _layers
   AND _z-t.z >= 0
   -- Ensure we are within zoom of the layer
-  AND coalesce(l.minzoom, 0) <= z
-  AND z <= coalesce(l.maxzoom, 24)
+  AND coalesce(p.minzoom, 0) <= z
+  AND z <= coalesce(p.maxzoom, 24)
   AND _x >= t.x*power(2, _z-t.z)
   AND _x < (t.x+1)*power(2, _z-t.z)
   AND _y >= t.y*power(2,_z-t.z)
@@ -63,14 +64,10 @@ WHERE layer_id = _mosaic
 ORDER BY z DESC
 LIMIT 1;
 $$ LANGUAGE SQL IMMUTABLE;
+*/
 
--- Link our tile cache to the tiler
-ALTER TABLE tile_cache.layer
-ADD COLUMN mosaic text REFERENCES imagery.mosaic(name);
-
-INSERT INTO tile_cache.layer (name, format, content_type, mosaic)
-SELECT name, 'png', 'image/png', name
-FROM imagery.mosaic
+INSERT INTO tile_cache.profile (name, format, content_type, minzoom, maxzoom)
+SELECT 'mars_imagery', 'png', 'image/png', 0, 18
 ON CONFLICT DO NOTHING;
 
 

@@ -52,3 +52,13 @@ class TestTileAPI:
         ).all()
         assert len(res) == len(asset_list)
         log.info(response.headers["Server-Timing"])
+
+    def test_tile_set_cache(self, client, db):
+        tile_address = dict(z=8, x=234, y=130)
+        response = client.get(
+            "/elevation-mosaic/tiles/{z}/{x}/{y}.png".format(**tile_address),
+        )
+        assert response.status_code == 200
+        assert response.headers["Content-Type"] == "image/png"
+        assert response.headers["X-Tile-Cache"] == "miss"
+        log.info(response.headers["Server-Timing"])
