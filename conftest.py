@@ -8,7 +8,7 @@ from pathlib import Path
 
 from mars_tiler.database import get_sync_database, initialize_database
 
-disable_loggers = ["rasterio"]
+disable_loggers = []  # "rasterio"]
 log = get_logger(__name__)
 
 load_dotenv()

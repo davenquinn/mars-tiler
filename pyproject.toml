@@ -32,11 +32,11 @@ black = {version = "^21.12b0", allow-prereleases = true}
 debugpy = "^1.5.1"
 pytest-dependency = "^0.5.1"
 python-dotenv = "^0.19.2"
+requests = "^2.27.1"
 "sparrow.birdbrain" = {path = "./deps/python-tools/birdbrain", develop = true}
 "sparrow.dinosaur" = {path = "./deps/python-tools/dinosaur", develop = true}
 "sparrow.utils" = {path = "./deps/python-tools/utils", develop = true}
 trio = "^0.19.0"
-requests = "^2.27.1"
 
 [tool.poetry.scripts]
 tile-server = "mars_tiler:cli"

@@ -15,21 +15,25 @@ from .cli import _update_info
 log = get_logger(__name__)
 
 
+def setup_test_datasets(db, fixtures_dir: Path):
+    Mosaic = db.model.imagery_mosaic
+    for name in ["hirise_red", "elevation_model"]:
+        db.session.add(Mosaic(name=name))
+    db.session.commit()
+
+    hirise = fixtures_dir.glob("*.tif")
+    _update_info(hirise, mosaic="hirise_red")
+
+    elevation_models = (fixtures_dir / "elevation-models").glob("*.tif")
+    _update_info(elevation_models, mosaic="elevation_model")
+    return db.session.query(db.model.imagery_dataset).all()
+
+
 @fixture(scope="session")
 def test_datasets(db_conn, fixtures_dir):
     db = db_conn
     with db.session_scope():
-        Mosaic = db.model.imagery_mosaic
-        for name in ["hirise_red", "elevation_model"]:
-            db.session.add(Mosaic(name=name))
-        db.session.commit()
-
-        hirise = fixtures_dir.glob("*.tif")
-        _update_info(hirise, mosaic="hirise_red")
-
-        elevation_models = (fixtures_dir / "elevation-models").glob("*.tif")
-        _update_info(elevation_models, mosaic="elevation_model")
-        return db.session.query(db.model.imagery_dataset).all()
+        return setup_test_datasets(db, fixtures_dir)
 
 
 def test_database(db):

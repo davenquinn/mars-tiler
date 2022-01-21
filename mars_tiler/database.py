@@ -50,7 +50,7 @@ def initialize_database(db):
         db.exec_sql(file)
 
 
-def get_sync_database(automap=False):
+def get_sync_database(automap=True):
     global db
     if db is None:
         db = SyncDatabase(environ.get("FOOTPRINTS_DATABASE"))

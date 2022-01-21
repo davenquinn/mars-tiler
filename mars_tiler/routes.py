@@ -15,6 +15,7 @@ from starlette.responses import Response, JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi import BackgroundTasks
 from cogeo_mosaic.errors import NoAssetFoundError
+import rasterio
 
 from morecantile import Tile
 from sparrow.utils import get_logger
@@ -108,8 +109,7 @@ class MosaicRouteFactory(MosaicTilerFactory):
 
             threads = int(os.getenv("MOSAIC_CONCURRENCY", MAX_THREADS))
             timer = Timer()
-            with timer.context() as t:
-                # with rasterio.Env(**self.gdal_config):
+            with timer.context() as t, rasterio.Env(**self.gdal_config):
                 if use_cache:
                     should_cache_tile = True
                     tile_info = self.get_cached_tile(src_path, x, y, z)
@@ -132,6 +132,7 @@ class MosaicRouteFactory(MosaicTilerFactory):
                     **self.backend_options,
                 ) as src_dst:
                     t.add_step("mosaicread")
+                    log.info("Entered RasterIO reader environment.")
                     data, _ = src_dst.tile(
                         x,
                         y,
