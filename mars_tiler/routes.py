@@ -118,7 +118,7 @@ class MosaicRouteFactory(MosaicTilerFactory):
                         headers = self._tile_headers(timer, tile_assets)
                         headers["X-Tile-Cache"] = "hit"
                         return Response(
-                            content=bytes(tile),
+                            content=bytes(tile_info.cached_tile),
                             media_type=tile_info.content_type,
                             headers=headers,
                         )
