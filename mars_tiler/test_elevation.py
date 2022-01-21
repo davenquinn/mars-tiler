@@ -43,6 +43,7 @@ class MarsTestMosaicBackend(MarsMosaicBackend):
                 rescale_range=None,
                 minzoom=0,
                 maxzoom=18,
+                overscaled=False,
             )
             for d in self.datasets
             if tile_feature.intersects(d.footprint)

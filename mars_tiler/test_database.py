@@ -1,39 +1,33 @@
 from sqlalchemy.exc import InternalError
 from pytest import fixture
 from decimal import Decimal
-from pathlib import Path
 from os import environ
-from sparrow.utils import get_logger, relative_path
+from sparrow.utils import get_logger
 from geoalchemy2.shape import to_shape, WKBElement
 from morecantile import Tile
 from pytest import mark, raises
 
-from .database import get_sync_database
 from .defs import mars_tms
 from .cli import _update_info
 
 log = get_logger(__name__)
 
 
-def setup_test_datasets(db, fixtures_dir: Path):
-    Mosaic = db.model.imagery_mosaic
-    for name in ["hirise_red", "elevation_model"]:
-        db.session.add(Mosaic(name=name))
-    db.session.commit()
-
-    hirise = fixtures_dir.glob("*.tif")
-    _update_info(hirise, mosaic="hirise_red")
-
-    elevation_models = (fixtures_dir / "elevation-models").glob("*.tif")
-    _update_info(elevation_models, mosaic="elevation_model")
-    return db.session.query(db.model.imagery_dataset).all()
-
-
 @fixture(scope="session")
 def test_datasets(db_conn, fixtures_dir):
     db = db_conn
     with db.session_scope():
-        return setup_test_datasets(db, fixtures_dir)
+        # Mosaic = db.model.imagery_mosaic
+        # for name in ["hirise_red", "elevation_model"]:
+        #     db.session.add(Mosaic(name=name))
+        # db.session.commit()
+
+        hirise = fixtures_dir.glob("*.tif")
+        _update_info(hirise, mosaic="hirise_red")
+
+        elevation_models = (fixtures_dir / "elevation-models").glob("*.tif")
+        _update_info(elevation_models, mosaic="elevation_model")
+        return db.session.query(db.model.imagery_dataset).all()
 
 
 def test_database(db):
