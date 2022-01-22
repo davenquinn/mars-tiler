@@ -80,12 +80,6 @@ def test_bad_tile(db, tile):
 
 
 class TestDatasets:
-    def test_add_mosaics(self, db):
-        Mosaic = db.model.imagery_mosaic
-        db.session.add(Mosaic(name="hirise_red"))
-        db.session.add(Mosaic(name="elevation_model"))
-        db.session.commit()
-
     def test_ingest_datasets(self, db, test_datasets):
         Dataset = db.model.imagery_dataset
 

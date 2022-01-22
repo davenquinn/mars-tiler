@@ -71,8 +71,13 @@ def test_basic_tiler(mosaic_backend):
 
 
 def test_elevation_tiler(elevation_backend):
-    test_tile = positions[0].tile
-    tile_data, assets = elevation_backend.tile(test_tile.x, test_tile.y, test_tile.z)
-    assert len(assets) == 2
+    test_tile = Tile(234, 130, 8)
+    assets = elevation_backend.get_assets(test_tile.x, test_tile.y, test_tile.z)
+    assert len(assets) == 3
+
+    tile_data, tile_assets = elevation_backend.tile(
+        test_tile.x, test_tile.y, test_tile.z
+    )
+    assert len(tile_assets) == 3
     assert isinstance(tile_data, ImageData)
     assert tile_data.data.shape == (3, 256, 256)
