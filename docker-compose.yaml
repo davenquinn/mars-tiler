@@ -6,9 +6,9 @@ services:
       - db
     environment:
       - MARS_TILER_TEST_DATABASE=postgresql://postgres@db:5432/mars_tiler_test
-      - CPL_TIMESTAMP=ON
-      - CPL_DEBUG=ON
-      - PROJ_DEBUG=3
+      # - CPL_TIMESTAMP=ON
+      # - CPL_DEBUG=ON
+      # - PROJ_DEBUG=3
   db:
     image: postgis/postgis:13-3.1
     environment:

@@ -17,10 +17,11 @@ log = get_logger(__name__)
 def test_datasets(db_conn, fixtures_dir):
     db = db_conn
     with db.session_scope():
-        # Mosaic = db.model.imagery_mosaic
-        # for name in ["hirise_red", "elevation_model"]:
-        #     db.session.add(Mosaic(name=name))
-        # db.session.commit()
+        Mosaic = db.model.imagery_mosaic
+        for name in ["hirise_red", "elevation_model"]:
+            if db.session.query(Mosaic).filter_by(name=name).count() == 0:
+                db.session.add(Mosaic(name=name))
+        db.session.commit()
 
         hirise = fixtures_dir.glob("*.tif")
         _update_info(hirise, mosaic="hirise_red")
@@ -79,12 +80,6 @@ def test_bad_tile(db, tile):
 
 
 class TestDatasets:
-    def test_add_mosaics(self, db):
-        Mosaic = db.model.imagery_mosaic
-        db.session.add(Mosaic(name="hirise_red"))
-        db.session.add(Mosaic(name="elevation_model"))
-        db.session.commit()
-
     def test_ingest_datasets(self, db, test_datasets):
         Dataset = db.model.imagery_dataset
 

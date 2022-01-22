@@ -13,3 +13,7 @@ run:
 
 run-docker:
 	./scripts/run-docker
+
+test-docker:
+	docker-compose build tile_server
+	docker-compose run --rm tile_server scripts/run-tests

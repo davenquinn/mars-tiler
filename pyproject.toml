@@ -15,6 +15,7 @@ psycopg-pool = "^3.0.3"
 pyproj = "^3.2.1"
 pytest = "^6.2.5"
 python = "^3.8"
+rasterio = {path = "./deps/rasterio", develop = true}
 rich = "^10.12.0"
 rio-rgbify = "^0.3.2"
 rio-tiler = "^3.0.2"

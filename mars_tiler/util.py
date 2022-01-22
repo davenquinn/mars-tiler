@@ -7,7 +7,7 @@ from rasterio.warp import transform_bounds
 import rasterio
 import logging
 from os import environ, path
-from .defs import mars_tms
+from .defs import mars_tms, MarsCRS
 from .defs.crs import MARS2000, MARS_EQC, mars_radius
 
 log = logging.getLogger(__name__)
@@ -91,9 +91,11 @@ class MarsCOGReader(COGReader):
     def __attrs_post_init__(self):
         self.tms = mars_tms
         self.geographic_crs = MARS2000
+        # ds = rasterio.open(self.input)
+        # self.dataset = rasterio.open(self.input, crs=MarsCRS.from_wkt(ds.crs.to_wkt()))
         super().__attrs_post_init__()
         # if self.crs.is_geographic and self.crs.data["R"] == mars_radius:
-        #     self.vrt_options = dict(crs=MARS_EQC)
+        # self.vrt_options = dict(crs=MarsCRS.from_wkt(self.crs.to_wkt()))
 
 
 def post_process(elevation, mask):
