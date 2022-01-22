@@ -63,7 +63,7 @@ COPY ./ /code/
 # Install the root package
 RUN poetry install --no-interaction --no-ansi
 
-CMD gunicorn mars_tiler:app \
+CMD .venv/bin/gunicorn mars_tiler:app \
   --bind 0.0.0.0:8000 \
   --workers 8 \
   --worker-class uvicorn.workers.UvicornWorker
