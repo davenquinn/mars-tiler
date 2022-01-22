@@ -2,7 +2,8 @@
 # https://stackoverflow.com/questions/53835198/integrating-python-poetry-with-docker
 # NOTE: we might want to make things a bit nicer here
 
-# Right now this must be built in the root directory of the Docker-compose project
+# This is basically the setup of RasterIO's own Dockerfile.
+# CA certificates should now be managed by the GDAL base image.
 FROM osgeo/gdal:ubuntu-small-3.3.3 AS base
 ENV LANG="C.UTF-8" LC_ALL="C.UTF-8"
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -19,36 +20,6 @@ COPY ./deps/rasterio /code/deps/rasterio
 RUN /code/.venv/bin/python setup.py install
 
 RUN apt-get update && apt-get install -y postgresql-client
-
-# RUN apt-get -y install software-properties-common \
-#   && add-apt-repository -y ppa:deadsnakes/ppa && apt-get update
-
-# RUN apt-get install -y --no-install-recommends \
-#   python3-dev \
-#   python3-pip \
-#   g++
-# # WORKDIR /code/deps/rasterio
-
-# RUN pip install --upgrade pip
-# # RUN pip wheel -r requirements-dev.txt
-# #RUN pip install -r requirements-dev.txt
-# #RUN python3 setup.py clean
-# #RUN pip install --no-deps -e .
-
-
-# # # Fix ca certificates error for LetsEncrypt (late 2021/early 2022 hotfix)
-# # # https://stackoverflow.com/questions/69408776/how-to-force-older-debian-to-forget-about-dst-root-ca-x3-expiration-and-use-isrg
-# # RUN apt update \
-# #   && apt install -y ca-certificates \
-# #   && sed -i '/^mozilla\/DST_Root_CA_X3.crt$/ s/^/!/' /etc/ca-certificates.conf \
-# #   && update-ca-certificates \
-# #   && rm -rf /var/lib/apt/lists/*
-
-# # # Attempt to fix certificates for LetsEncrypt
-# # # https://github.com/brazil-data-cube/stac.py/issues/112
-# # RUN pip install certifi-system-store && python -m certifi -v
-
-# # Install GDAL and postgres client
 
 FROM base AS main
 
