@@ -7,10 +7,8 @@ mercator_tms = tms.get("WebMercatorQuad")
 
 # monkey-patch rasterio to use Mars projections
 
-_CRS_OLD = rasterio.crs.CRS
 
-
-class MarsCRS(_CRS_OLD):
+class MarsCRS(rasterio.crs.CRS):
     def to_epsg(self):
         return None
 
@@ -18,15 +16,11 @@ class MarsCRS(_CRS_OLD):
         return None
 
 
-rasterio.crs.CRS = MarsCRS
-
-
 class MarsTMS(TileMatrixSet):
     @property
     def rasterio_crs(self):
         """Return rasterio CRS."""
-
-        return MarsCRS.from_wkt(self.crs.to_wkt())
+        return MarsCRS.from_wkt(mars_mercator_wkt)
 
 
 mars_tms = MarsTMS.custom(

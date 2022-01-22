@@ -64,15 +64,13 @@ def elevation_backend(elevation_models):
     return ElevationTestMosaicBackend(elevation_models)
 
 
-@mark.anyio
-async def test_basic_tiler(mosaic_backend):
+def test_basic_tiler(mosaic_backend):
     test_tile = positions[0].tile
     tile_data, assets = mosaic_backend.tile(test_tile.x, test_tile.y, test_tile.z)
     assert tile_data.data.shape == (1, 256, 256)
 
 
-@mark.anyio
-async def test_elevation_tiler(elevation_backend):
+def test_elevation_tiler(elevation_backend):
     test_tile = positions[0].tile
     tile_data, assets = elevation_backend.tile(test_tile.x, test_tile.y, test_tile.z)
     assert len(assets) == 2

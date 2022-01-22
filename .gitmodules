@@ -1,3 +1,6 @@
 [submodule "deps/python-tools"]
 	path = deps/python-tools
 	url = git://github.com/UW-Macrostrat/python-tools.git
+[submodule "deps/rasterio"]
+	path = deps/rasterio
+	url = git://github.com/davenquinn/rasterio.git

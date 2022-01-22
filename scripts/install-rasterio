@@ -1,0 +1,22 @@
+#!/bin/bash
+apt-get update
+apt-get -y install software-properties-common
+add-apt-repository -y ppa:deadsnakes/ppa
+apt-get update
+
+apt-get install -y --no-install-recommends \
+  python3.9 \
+  python3.9-dev \
+  python3.9-venv \
+  python3-pip \
+  g++
+
+python3.9 -m venv testenv
+. testenv/bin/activate
+python -m pip install --upgrade pip
+python -m pip wheel -r requirements-dev.txt
+python -m pip install -r requirements-dev.txt
+python setup.py clean
+python -m pip install --no-deps --force-reinstall --no-use-pep517 -e .[test]
+
+python -m pytest -v -m "not wheel" -rxXs --cov rasterio --cov-report term-missing

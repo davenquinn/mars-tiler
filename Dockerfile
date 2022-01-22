@@ -3,25 +3,65 @@
 # NOTE: we might want to make things a bit nicer here
 
 # Right now this must be built in the root directory of the Docker-compose project
+FROM osgeo/gdal:ubuntu-small-3.3.3 AS base
+ENV LANG="C.UTF-8" LC_ALL="C.UTF-8"
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+  python3 python3-pip python3-dev python3-venv cython3 g++ gdb postgresql-client && \
+  rm -rf /var/lib/apt/lists/*
 
-FROM python:3.9-bullseye
+WORKDIR /code/deps/rasterio
+COPY ./deps/rasterio/requirements*.txt ./
+RUN python3 -m venv /code/.venv && \
+  /code/.venv/bin/python -m pip install -U pip && \
+  /code/.venv/bin/python -m pip install -r requirements-dev.txt
+
+COPY ./deps/rasterio /code/deps/rasterio
+RUN /code/.venv/bin/python setup.py install
+
+RUN apt-get update && apt-get install -y postgresql-client
+
+# RUN apt-get -y install software-properties-common \
+#   && add-apt-repository -y ppa:deadsnakes/ppa && apt-get update
+
+# RUN apt-get install -y --no-install-recommends \
+#   python3-dev \
+#   python3-pip \
+#   g++
+# # WORKDIR /code/deps/rasterio
+
+# RUN pip install --upgrade pip
+# # RUN pip wheel -r requirements-dev.txt
+# #RUN pip install -r requirements-dev.txt
+# #RUN python3 setup.py clean
+# #RUN pip install --no-deps -e .
+
+
+# # # Fix ca certificates error for LetsEncrypt (late 2021/early 2022 hotfix)
+# # # https://stackoverflow.com/questions/69408776/how-to-force-older-debian-to-forget-about-dst-root-ca-x3-expiration-and-use-isrg
+# # RUN apt update \
+# #   && apt install -y ca-certificates \
+# #   && sed -i '/^mozilla\/DST_Root_CA_X3.crt$/ s/^/!/' /etc/ca-certificates.conf \
+# #   && update-ca-certificates \
+# #   && rm -rf /var/lib/apt/lists/*
+
+# # # Attempt to fix certificates for LetsEncrypt
+# # # https://github.com/brazil-data-cube/stac.py/issues/112
+# # RUN pip install certifi-system-store && python -m certifi -v
+
+# # Install GDAL and postgres client
+
+FROM base AS main
+
+WORKDIR /code/
+
+RUN pip3 install "poetry==1.1.12" && \
+  rm -rf /var/lib/apt/lists/* && \
+  poetry config virtualenvs.in-project true
 
 WORKDIR /code
 
-RUN pip install "poetry==1.1.11" && \
-  rm -rf /var/lib/apt/lists/* && \
-  poetry config virtualenvs.create false
-
-# Fix ca certificates error for LetsEncrypt (late 2021/early 2022 hotfix)
-# https://stackoverflow.com/questions/69408776/how-to-force-older-debian-to-forget-about-dst-root-ca-x3-expiration-and-use-isrg
-RUN apt update \
-  && apt install -y ca-certificates \
-  && sed -i '/^mozilla\/DST_Root_CA_X3.crt$/ s/^/!/' /etc/ca-certificates.conf \
-  && update-ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
-
-# Install python tools
-COPY ./deps/python-tools ./deps/python-tools/
+# Install local dependencies
+COPY ./deps/python-tools /code/deps/python-tools
 
 ENV PIP_DEFAULT_TIMEOUT=100 \
   PIP_DISABLE_PIP_VERSION_CHECK=1
@@ -30,7 +70,7 @@ ENV PIP_DEFAULT_TIMEOUT=100 \
 COPY ./poetry.lock /code/
 COPY ./pyproject.toml /code/
 
-# Project initialization:
+# # Project initialization:
 RUN poetry install --no-interaction --no-ansi --no-root
 
 EXPOSE 8000
@@ -51,13 +91,6 @@ COPY ./ /code/
 
 # Install the root package
 RUN poetry install --no-interaction --no-ansi
-
-# Attempt to fix certificates for LetsEncrypt
-# https://github.com/brazil-data-cube/stac.py/issues/112
-RUN pip install certifi-system-store && python -m certifi -v
-
-RUN apt-get update && apt-get install -y postgresql-client
-
 
 CMD gunicorn mars_tiler:app \
   --bind 0.0.0.0:8000 \

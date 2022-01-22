@@ -14,10 +14,11 @@ crs = MarsCRS.from_wkt(MARS_MERCATOR.to_wkt())
 
 
 def open_all_vrts():
-    for file in datasets:
-        with rasterio.open(file) as src:
-            with WarpedVRT(src, crs=crs) as vrt:
-                vrt.read(1)
+    with rasterio.Env():
+        for file in datasets:
+            with rasterio.open(file) as src:
+                with WarpedVRT(src, crs=crs) as vrt:
+                    vrt.read(1)
 
 
 cProfile.run(f"open_all_vrts()", sort="cumtime")
