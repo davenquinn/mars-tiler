@@ -162,14 +162,15 @@ BEGIN
       AND t.y = _y
       AND t.z = _z
     LIMIT 1
-  ), update_cache AS (
-    UPDATE tile_cache.tile
-      SET last_used = now()
-    WHERE x = _x
-      AND y = _y
-      AND z = _z
-      AND layers = _layers
   )
+  -- ), update_cache AS (
+  --   UPDATE tile_cache.tile
+  --     SET last_used = now()
+  --   WHERE x = _x
+  --     AND y = _y
+  --     AND z = _z
+  --     AND layers = _layers
+  -- )
   SELECT
     ds1.datasets::jsonb,
     imagery.should_generate_tile(_x, _y, _z, _layers),
