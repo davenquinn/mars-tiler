@@ -1,4 +1,19 @@
 CREATE OR REPLACE FUNCTION
+  imagery._tile_envelope(
+    _x integer,
+    _y integer,
+    _z integer,
+    _tms text = 'mars_mercator'
+  ) RETURNS geometry(Polygon)
+AS $$
+  SELECT ST_TileEnvelope(
+    _z, _x, _y,
+    (SELECT bounds FROM imagery.tms WHERE name = _tms)
+  );
+$$ LANGUAGE SQL;
+
+
+CREATE OR REPLACE FUNCTION
   imagery.tile_envelope(
     _x integer,
     _y integer,
@@ -7,10 +22,7 @@ CREATE OR REPLACE FUNCTION
   ) RETURNS geometry(Polygon, 949900)
 AS $$
   SELECT ST_Transform(
-    ST_TileEnvelope(
-      _z, _x, _y,
-      (SELECT bounds FROM imagery.tms WHERE name = _tms)
-    ),
+    imagery._tile_envelope(_x, _y, _z, _tms),
     949900
   );
 $$ LANGUAGE SQL;

@@ -89,7 +89,7 @@ def _update_info(datasets, mosaic=None):
         except Exception as e:
             pass
 
-        dataset = db.get_or_create(Dataset, name=path.stem)
+        dataset = db.get_or_create(Dataset, path=str(path))
         for k, v in kw.items():
             setattr(dataset, k, v)
         db.session.add(dataset)
